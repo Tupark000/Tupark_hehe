@@ -1,200 +1,551 @@
+
+
+// require("dotenv").config();
+// const express = require("express");
+// const expressWs = require("express-ws");
+// const mysql = require("mysql2");
+// const cors = require("cors");
+// const bodyParser = require("body-parser");
+// const WebSocket = require("ws");
+
+// const app = express();
+// expressWs(app);
+
+// const PORT = 5000;
+// const WEBSOCKET_PORT = 3001;
+
+// app.use(express.json());
+// app.use(bodyParser.json());
+// app.use(cors());
+
+// // MySQL Connection
+// const db = mysql.createConnection({
+//   host: "localhost",
+//   user: "root",
+//   password: "admin12345",
+//   database: "rfid_db",
+// });
+
+// db.connect((err) => {
+//   if (err) {
+//     console.error("❌ Database connection failed:", err);
+//   } else {
+//     console.log("✅ Connected to MySQL database");
+//   }
+// });
+
+// // Express Server
+// app.listen(PORT, () => {
+//   console.log(`🚀 Express server running at http://192.168.100.201:${PORT}`);
+// });
+
+// // WebSocket Server
+// const wss = new WebSocket.Server({ port: WEBSOCKET_PORT }, () => {
+//   console.log(`🔗 WebSocket Server running on ws://192.168.100.201:${WEBSOCKET_PORT}`);
+// });
+
+// // 🔁 Broadcast helper
+// function broadcastToClients(message) {
+//   const data = JSON.stringify(message);
+//   wss.clients.forEach((client) => {
+//     if (client.readyState === WebSocket.OPEN) {
+//       client.send(data);
+//     }
+//   });
+// }
+
+// // 🧠 WebSocket Event Handler
+// wss.on("connection", (ws) => {
+//   console.log("🌐 New WebSocket Connection Established");
+
+//   ws.on("message", (msg) => {
+//     try {
+//       const data = JSON.parse(msg);
+//       const uid = data.scanned_uid;
+
+//       if (!uid) {
+//         console.log("⚠️ No RFID UID received.");
+//         return;
+//       }
+
+//       console.log(`📡 Received UID: ${uid} | Type: ${data.type || "unknown"}`);
+
+//       if (data.type === "exit") {
+//         processExitRFID(uid);
+//       } else {
+//         broadcastToClients({ scanned_uid: uid });
+//       }
+//     } catch (err) {
+//       console.error("❌ Error processing WebSocket message:", err);
+//     }
+//   });
+
+//   ws.on("close", () => {
+//     console.log("🔌 WebSocket Disconnected");
+//   });
+// });
+
+// // ✅ Function: Process Exit RFID
+// function processExitRFID(rfid_uid) {
+//   const checkQuery = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+//   db.query(checkQuery, [rfid_uid], (err, result) => {
+//     if (err) {
+//       console.error("❌ Database error:", err);
+//       return;
+//     }
+
+//     if (result.length === 0) {
+//       console.log("⚠️ RFID not found or already exited.");
+//       return;
+//     }
+
+//     const updateQuery = "UPDATE users SET status = 'INACTIVE', time_out = NOW() WHERE rfid_uid = ?";
+//     db.query(updateQuery, [rfid_uid], (err2) => {
+//       if (err2) {
+//         console.error("❌ Error updating user status:", err2);
+//         return;
+//       }
+
+//       console.log(`✅ User with RFID ${rfid_uid} marked as INACTIVE`);
+
+//       // Inform connected clients
+//       broadcastToClients({ update: "user_exited", rfid_uid });
+//     });
+//   });
+// }
+
+// // 🔒 Login
+// app.post("/login", (req, res) => {
+//   const { email, password } = req.body;
+//   const query = "SELECT * FROM admins WHERE email = ? AND password = ?";
+//   db.query(query, [email, password], (err, result) => {
+//     if (err) return res.status(500).json({ success: false, error: "Internal server error" });
+//     if (result.length > 0) {
+//       res.json({ success: true, message: "Login successful", admin: result[0] });
+//     } else {
+//       res.status(401).json({ success: false, message: "Invalid credentials" });
+//     }
+//   });
+// });
+// // ➕ Add User (Entrance) with ACTIVE UID check
+// app.post("/api/users", (req, res) => {
+//   const { name, plate_number, rfid_uid } = req.body;
+
+//   if (!name || !plate_number || !rfid_uid) {
+//     return res.status(400).json({ message: "Missing required fields" });
+//   }
+
+//   // ✅ Check if ANY user is ACTIVE with the same RFID UID
+//   const checkQuery = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+//   db.query(checkQuery, [rfid_uid], (err, results) => {
+//     if (err) {
+//       console.error("❌ Error checking existing UID:", err);
+//       return res.status(500).json({ message: "Database error" });
+//     }
+
+//     if (results.length > 0) {
+//       return res.status(409).json({ message: "RFID is currently in use by an ACTIVE user." });
+//     }
+
+//     // ✅ Proceed to insert
+//     const insertQuery = `
+//       INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
+//       VALUES (?, ?, ?, NOW(), 'ACTIVE')
+//     `;
+
+//     db.query(insertQuery, [name, plate_number, rfid_uid], (err2) => {
+//       if (err2) {
+//         console.error("❌ Error inserting user:", err2);
+//         return res.status(500).json({ message: "Insert failed" });
+//       }
+
+//       console.log(`✅ User ${name} added successfully with RFID ${rfid_uid}`);
+//       broadcastToClients({ update: "new_user_added", name, plate_number, rfid_uid });
+
+//       res.status(201).json({ message: "User added successfully" });
+//     });
+//   });
+// });
+
+
+// // 📤 Get all ACTIVE users
+// app.get("/api/users", (req, res) => {
+//   const query = "SELECT * FROM users WHERE status = 'ACTIVE' ORDER BY time_in DESC";
+//   db.query(query, (err, results) => {
+//     if (err) {
+//       console.error("❌ Error fetching users:", err);
+//       return res.status(500).json({ error: "Database error" });
+//     }
+//     res.status(200).json(results);
+//   });
+// });
+
+
+
+// // ❌ Manual Exit (Optional API)
+// app.post("/api/users/exit", (req, res) => {
+//   const { rfid_uid } = req.body;
+//   if (!rfid_uid) {
+//     return res.status(400).json({ error: "Missing RFID UID" });
+//   }
+
+//   processExitRFID(rfid_uid);
+//   res.status(200).json({ message: "Exit process initiated" });
+// });
+
+// // 📥 Get all INACTIVE users (for exit_dashboard_page)
+// app.get("/api/users/inactive", (req, res) => {
+//   const query = "SELECT * FROM users WHERE status = 'INACTIVE' ORDER BY time_out DESC";
+//   db.query(query, (err, results) => {
+//     if (err) {
+//       console.error("❌ Error fetching INACTIVE users:", err);
+//       return res.status(500).json({ error: "Database error" });
+//     }
+//     res.status(200).json(results);
+//   });
+// });
+
+// // ➕ Add Reservation
+// app.post("/api/reservations", (req, res) => {
+//   const { name, plate_number, rfid_uid, expected_time_in } = req.body;
+
+//   if (!name || !plate_number || !rfid_uid || !expected_time_in) {
+//     return res.status(400).json({ error: "Missing reservation fields" });
+//   }
+
+//   const insertQuery = `
+//     INSERT INTO reservation (name, plate_number, rfid_uid, expected_time_in)
+//     VALUES (?, ?, ?, ?)
+//   `;
+
+//   db.query(insertQuery, [name, plate_number, rfid_uid, expected_time_in], (err, result) => {
+//     if (err) {
+//       console.error("❌ Error adding reservation:", err);
+//       return res.status(500).json({ error: "Database error" });
+//     }
+
+//     console.log(`📌 Reservation added for ${name} at ${expected_time_in}`);
+//     res.status(201).json({ message: "Reservation added successfully" });
+//   });
+// });
+
 require("dotenv").config();
 const express = require("express");
+const expressWs = require("express-ws");
 const mysql = require("mysql2");
 const cors = require("cors");
+const bodyParser = require("body-parser");
+const WebSocket = require("ws");
+const moment = require('moment');
 
 const app = express();
+expressWs(app);
+
+const PORT = 5000;
+const WEBSOCKET_PORT = 3001;
+
 app.use(express.json());
+app.use(bodyParser.json());
 app.use(cors());
 
 // Database connection
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
-  password: "admin12345", // Change this to your MySQL root password
+  password: "admin12345",
   database: "rfid_db",
 });
 
 db.connect((err) => {
   if (err) {
-    console.error("Database connection failed:", err);
+    console.error("❌ Database connection failed:", err);
   } else {
-    console.log("Connected to MySQL database");
+    console.log("✅ Connected to MySQL database");
   }
 });
 
-// API Route: Get active users
-app.get("/users", (req, res) => {
-  db.query("SELECT * FROM users WHERE active = 1", (err, results) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+// WebSocket Server
+const wss = new WebSocket.Server({ port: WEBSOCKET_PORT }, () => {
+  console.log(`🔗 WebSocket Server running on ws://192.168.100.96:${WEBSOCKET_PORT}`);
+});
+
+// Broadcast message to all connected clients
+function broadcastToClients(message) {
+  const data = JSON.stringify(message);
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(data);
     }
-    res.json(results);
   });
-});
+}
 
-// API Route: Add new user
-app.post("/add-user", (req, res) => {
-  const { name, plate_no, rfid } = req.body;
-  const sql = "INSERT INTO users (name, plate_no, rfid, active) VALUES (?, ?, ?, 1)";
-  db.query(sql, [name, plate_no, rfid], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "User added successfully", userId: result.insertId });
-  });
-});
+// WebSocket handling
+wss.on("connection", (ws) => {
+  console.log("🌐 New WebSocket Connection");
 
-// API Route: Mark RFID as inactive (exit scanner)
-app.post("/deactivate-rfid", (req, res) => {
-  const { rfid } = req.body;
-  const sql = "UPDATE users SET active = 0 WHERE rfid = ?";
-  db.query(sql, [rfid], (err, result) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "RFID deactivated successfully" });
-  });
-});
-
-// Login API
-app.post("/login", (req, res) => {
-    const { email, password } = req.body;
-    const query = "SELECT * FROM admins WHERE email = ? AND password = ?";
-    
-    db.query(query, [email, password], (err, result) => {
-      if (err) {
-        res.status(500).send("Server error");
-      } else if (result.length > 0) {
-        res.status(200).json({ message: "Login successful" });
-      } else {
-        res.status(401).json({ message: "Invalid email or password" });
-      }
-    });
-  });
-
-  app.post("/deactivate-rfid", (req, res) => {
-    const { rfid } = req.body;
-    const sql = "UPDATE users SET active = 0, time_out = NOW() WHERE rfid = ? AND active = 1";
-    
-    db.query(sql, [rfid], (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (result.affectedRows > 0) {
-        res.json({ message: "RFID deactivated successfully" });
-      } else {
-        res.status(400).json({ error: "RFID not found or already inactive" });
-      }
-    });
-  });
-
-  // API Route: Add a Reservation
-app.post("/add-reservation", (req, res) => {
-    const { name, plate_no, rfid, expected_time } = req.body;
-    const sql = "INSERT INTO reservations (name, plate_no, rfid, expected_time, status) VALUES (?, ?, ?, ?, 'Pending')";
-    
-    db.query(sql, [name, plate_no, rfid, expected_time], (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json({ message: "Reservation added successfully", reservationId: result.insertId });
-    });
-  });
-  
-  // API Route: Get Pending Reservations
-  app.get("/reservations", (req, res) => {
-    db.query("SELECT * FROM reservations WHERE status = 'Pending'", (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(results);
-    });
-  });
-  
- // API Route: Transfer reservations to active users when time arrives
- app.post('/transfer-reservations', async (req, res) => {
+  ws.on("message", (msg) => {
     try {
-        const now = new Date(); 
-        const formattedNow = now.toISOString().slice(0, 19).replace('T', ' ');
+      const data = JSON.parse(msg);
+      const uid = data.scanned_uid;
+      const type = data.type;
 
-        const [reservations] = await db.query(
-            "SELECT * FROM reservations WHERE expected_time <= ?", [formattedNow]
-        );
+      if (!uid) {
+        console.log("⚠️ No UID received");
+        return;
+      }
 
-        for (let reservation of reservations) {
-            await db.query(
-                "INSERT INTO active_users (name, plate_number, rfid, time_in) VALUES (?, ?, ?, ?)",
-                [reservation.name, reservation.plate_number, reservation.rfid, formattedNow]
-            );
+      if (type === "exit") {
+        processExitRFID(uid);
+      } else {
+        // Broadcast to all (entrance and reservation included)
+        broadcastToClients({ scanned_uid: uid });
+      }
+    } catch (err) {
+      console.error("❌ WebSocket error:", err);
+    }
+  });
 
-            await db.query("DELETE FROM reservations WHERE rfid = ?", [reservation.rfid]);
+  ws.on("close", () => {
+    console.log("🔌 WebSocket Disconnected");
+  });
+});
+
+// Process Exit
+function processExitRFID(rfid_uid) {
+  const checkQuery = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+  db.query(checkQuery, [rfid_uid], (err, result) => {
+    if (err) {
+      console.error("❌ DB error:", err);
+      return;
+    }
+
+    if (result.length === 0) {
+      console.log("⚠️ UID not found or already exited.");
+      return;
+    }
+
+    const updateQuery = "UPDATE users SET status = 'INACTIVE', time_out = NOW() WHERE rfid_uid = ?";
+    db.query(updateQuery, [rfid_uid], (err2) => {
+      if (err2) {
+        console.error("❌ Exit update error:", err2);
+        return;
+      }
+
+      console.log(`✅ RFID ${rfid_uid} marked as INACTIVE`);
+      broadcastToClients({ update: "user_exited", rfid_uid });
+    });
+  });
+}
+
+// Login
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+  const query = "SELECT * FROM admins WHERE email = ? AND password = ?";
+  db.query(query, [email, password], (err, result) => {
+    if (err) return res.status(500).json({ success: false });
+    if (result.length > 0) {
+      res.json({ success: true, admin: result[0] });
+    } else {
+      res.status(401).json({ success: false });
+    }
+  });
+});
+
+// Add User (Entrance)
+app.post("/api/users", (req, res) => {
+  const { name, plate_number, rfid_uid } = req.body;
+
+  if (!name || !plate_number || !rfid_uid) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const checkQuery = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+  db.query(checkQuery, [rfid_uid], (err, results) => {
+    if (err) {
+      console.error("❌ Error checking UID:", err);
+      return res.status(500).json({ message: "Database error" });
+    }
+
+    if (results.length > 0) {
+      return res.status(409).json({ message: "RFID is currently in use by an ACTIVE user." });
+    }
+
+    const insertQuery = `
+      INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
+      VALUES (?, ?, ?, NOW(), 'ACTIVE')
+    `;
+
+    db.query(insertQuery, [name, plate_number, rfid_uid], (err2) => {
+      if (err2) {
+        console.error("❌ Insert user failed:", err2);
+        return res.status(500).json({ message: "Insert failed" });
+      }
+
+      console.log(`✅ Added user ${name} with RFID ${rfid_uid}`);
+      broadcastToClients({ update: "new_user_added", name, plate_number, rfid_uid });
+
+      res.status(201).json({ message: "User added successfully" });
+    });
+  });
+});
+
+// Get all ACTIVE users
+app.get("/api/users", (req, res) => {
+  const query = "SELECT * FROM users WHERE status = 'ACTIVE' ORDER BY time_in DESC";
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
+    res.status(200).json(results);
+  });
+});
+
+// Get INACTIVE users (for exit dashboard)
+app.get("/api/users/inactive", (req, res) => {
+  const query = "SELECT * FROM users WHERE status = 'INACTIVE' ORDER BY time_out DESC";
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
+    res.status(200).json(results);
+  });
+});
+
+// Manual exit endpoint
+app.post("/api/users/exit", (req, res) => {
+  const { rfid_uid } = req.body;
+  if (!rfid_uid) return res.status(400).json({ error: "Missing RFID UID" });
+
+  processExitRFID(rfid_uid);
+  res.status(200).json({ message: "Exit processed" });
+});
+
+// Add Reservation
+app.post("/api/reservations", (req, res) => {
+  const { name, plate_number, rfid_uid, expected_time_in } = req.body;
+
+  if (!name || !plate_number || !rfid_uid || !expected_time_in) {
+    return res.status(400).json({ error: "Missing reservation fields" });
+  }
+
+  const insertQuery = `
+  INSERT INTO reservation (name, plate_number, rfid_uid, expected_time_in)
+  VALUES (?, ?, ?, ?)
+`;
+
+  db.query(insertQuery, [name, plate_number, rfid_uid, expected_time_in], (err, result) => {
+    if (err) {
+      console.error("❌ Reservation error:", err);
+      return res.status(500).json({ error: "Failed to add reservation" });
+    }
+
+    console.log(`📌 Reservation for ${name} added`);
+    res.status(201).json({ message: "Reservation added" });
+  });
+});
+
+// 📥 Get all Reservations
+app.get("/api/reservations", (req, res) => {
+  const query = "SELECT * FROM reservation ORDER BY expected_time_in DESC";
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching reservations:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    res.status(200).json(results);
+  });
+});
+
+
+setInterval(() => {
+  const query = `SELECT * FROM reservation WHERE expected_time_in <= NOW()`;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("❌ Error checking reservations:", err);
+      return;
+    }
+
+    results.forEach((reservation) => {
+      const { name, plate_number, rfid_uid, expected_time_in } = reservation;
+
+      // First, check if the RFID is already active (just in case)
+      const checkUser = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+      db.query(checkUser, [rfid_uid], (err2, existing) => {
+        if (err2) {
+          console.error("❌ Error checking active users before reservation transfer:", err2);
+          return;
         }
 
-        res.json({ message: "Reservations transferred successfully." });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error transferring reservations." });
+        if (existing.length === 0) {
+          // No active user with that RFID, so transfer to users table
+          const insertUser = `
+            INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
+            VALUES (?, ?, ?, NOW(), 'ACTIVE')
+          `;
+          db.query(insertUser, [name, plate_number, rfid_uid], (err3) => {
+            if (err3) {
+              console.error("❌ Error inserting reservation into users:", err3);
+              return;
+            }
+
+            // Now delete the reservation
+            const deleteReservation = `DELETE FROM reservation WHERE rfid_uid = ?`;
+            db.query(deleteReservation, [rfid_uid], (err4) => {
+              if (err4) {
+                console.error("❌ Error deleting reservation:", err4);
+              } else {
+                console.log(`✅ Reservation for ${name} transferred to ACTIVE users.`);
+                broadcastToClients({ update: "reservation_transferred", rfid_uid });
+              }
+            });
+          });
+        }
+      });
+    });
+  });
+}, 30000); // Runs every 30 seconds
+
+
+// 🔄 Periodically check for due reservations and move them to users
+setInterval(() => {
+  const now = new Date();
+  const formattedNow = now.toISOString().slice(0, 19).replace("T", " ");
+
+  const fetchDueQuery = `SELECT * FROM reservation WHERE expected_time_in <= ?`;
+
+  db.query(fetchDueQuery, [formattedNow], (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching due reservations:", err);
+      return;
     }
-  
-    
-    // Get the reservation details
-    const getReservation = "SELECT * FROM reservations WHERE rfid = ? AND status = 'Pending'";
-    db.query(getReservation, [rfid], (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      if (result.length === 0) return res.status(404).json({ message: "No pending reservation found" });
-  
-      const user = result[0];
-      const time_in = new Date();
-  
-      // Insert into users table
-      const insertUser = "INSERT INTO users (name, plate_no, rfid, time_in, active) VALUES (?, ?, ?, ?, 1)";
-      db.query(insertUser, [user.name, user.plate_no, user.rfid, time_in], (err, response) => {
-        if (err) return res.status(500).json({ error: err.message });
-  
-        // Mark reservation as 'Active'
-        const updateReservation = "UPDATE reservations SET status = 'Active' WHERE rfid = ?";
-        db.query(updateReservation, [rfid], (err) => {
-          if (err) return res.status(500).json({ error: err.message });
-          res.json({ message: "Reservation activated successfully" });
+
+    results.forEach((resv) => {
+      const { name, plate_number, rfid_uid, expected_time_in } = resv;
+
+      // Prevent duplicate ACTIVE users
+      const checkQuery = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+      db.query(checkQuery, [rfid_uid], (checkErr, checkResult) => {
+        if (checkErr || checkResult.length > 0) return;
+
+        const insertQuery = `
+          INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
+          VALUES (?, ?, ?, ?, 'ACTIVE')
+        `;
+        db.query(insertQuery, [name, plate_number, rfid_uid, expected_time_in], (insertErr) => {
+          if (insertErr) return;
+
+          // Delete reservation after transfer
+          db.query("DELETE FROM reservation WHERE rfid_uid = ?", [rfid_uid]);
+
+          console.log(`🔄 Reservation for ${name} transferred to active users`);
+
+          // Notify WebSocket clients (Dashboard)
+          broadcastToClients({ update: "reservation_activated", rfid_uid });
         });
       });
     });
-  });  
-
-  app.post('/exit-user', async (req, res) => {
-    const { rfid } = req.body;
-
-    if (!rfid) {
-        return res.status(400).json({ message: "RFID is required" });
-    }
-
-    try {
-        const [user] = await db.query("SELECT * FROM users WHERE rfid = ? AND active = 1", [rfid]);
-
-        if (user.length === 0) {
-            return res.status(404).json({ message: "Active user not found" });
-        }
-
-        // Mark user as inactive & log exit time
-        await db.query("UPDATE users SET active = 0, time_out = NOW() WHERE rfid = ?", [rfid]);
-
-        return res.json({ message: "User exited successfully" });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Server error" });
-    }});
-
-    
-  
+  });
+}, 5000); // Check every 5 seconds
 
 
-
-// // Start the server
-// const PORT = process.env.PORT || 5000;
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-
-
-//   const app = express();
-  // your middlewares and routes here...
-  
-  // Only start listening if not running in serverless
-  if (process.env.NODE_ENV !== "production") {
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  }
-  
-module.exports = app;
+// ⚠️ Make sure this line remains LAST in your server.js
+app.listen(PORT, () => {
+  console.log(`🚀 Express server running at http://192.168.100.96:${PORT}`);
+});
