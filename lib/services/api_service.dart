@@ -7,9 +7,10 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 class ApiService {
   // Base URL for REST API and WebSockets
-  static final String apiUrl = "http://192.168.100.96:5000";
-  static const String wsEntranceUrl = "ws://192.168.100.96:3001/ws/entrance";
-  static const String wsExitUrl = "ws://192.168.100.96:3001/ws/exit";
+static final String apiUrl = "https://rfid-backend.onrender.com";
+static const String wsEntranceUrl = "wss://rfid-backend.onrender.com/ws/entrance";
+static const String wsExitUrl = "wss://rfid-backend.onrender.com/ws/exit";
+
 
   // Fetch all users
   static Future<List<dynamic>> fetchUsers() async {
