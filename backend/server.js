@@ -815,7 +815,6 @@ app.post("/api/reservations", (req, res) => {
     }
   );
 });
-
 app.get("/api/reservations", (req, res) => {
   const query = "SELECT * FROM reservation ORDER BY expected_time_in DESC";
   db.query(query, (err, results) => {
