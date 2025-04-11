@@ -22,24 +22,27 @@ class _AddUserPageState extends State<AddUserPage> {
   }
 
   void _initWebSocket() {
-    channel = IOWebSocketChannel.connect('ws://192.168.100.96:3001/ws/entrance');
+  channel = IOWebSocketChannel.connect(
+    Uri.parse('wss://tuparkhehe-production.up.railway.app/ws'),
+  );
 
-    channel.stream.listen((message) {
-      try {
-        Map<String, dynamic> data = jsonDecode(message);
-        if (data.containsKey('scanned_uid')) {
-          setState(() {
-            scannedRFID = data['scanned_uid'];
-          });
-          print("✅ RFID Updated: $scannedRFID");
-        }
-      } catch (e) {
-        print("⚠️ Error parsing WebSocket message: $e");
+  channel.stream.listen((message) {
+    try {
+      Map<String, dynamic> data = jsonDecode(message);
+      if (data.containsKey('scanned_uid')) {
+        setState(() {
+          scannedRFID = data['scanned_uid'];
+        });
+        print("✅ RFID Updated: $scannedRFID");
       }
-    }, onError: (error) {
-      print("❌ WebSocket Error: $error");
-    });
-  }
+    } catch (e) {
+      print("⚠️ Error parsing WebSocket message: $e");
+    }
+  }, onError: (error) {
+    print("❌ WebSocket Error: $error");
+  });
+}
+
 
   @override
   void dispose() {

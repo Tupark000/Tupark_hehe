@@ -10,8 +10,6 @@ class ApiService {
 static final String apiUrl = "https://tuparkhehe-production.up.railway.app";
 static const String wsUrl = "wss://tuparkhehe-production.up.railway.app/ws";
 
-
-
   // Fetch all users
   static Future<List<dynamic>> fetchUsers() async {
     final response = await http.get(Uri.parse("$apiUrl/api/users"));
