@@ -624,7 +624,7 @@ const WebSocket = require("ws");
 const moment = require("moment");
 
 const app = express();
-expressWs(app);
+const expressWsInstance = expressWs(app);
 
 const PORT = process.env.PORT || 5000;
 
@@ -657,7 +657,7 @@ const server = app.listen(PORT, () => {
 // ====== WebSocket Setup (/ws for both entrance & exit) ======
 function broadcastToClients(message) {
   const data = JSON.stringify(message);
-  app.getWss().clients.forEach((client) => {
+  expressWsInstance.getWss().clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(data);
     }
