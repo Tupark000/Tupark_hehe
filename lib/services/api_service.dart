@@ -114,7 +114,7 @@ static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
 
   // ===== WebSocket for Exit Scans =====
   static WebSocketChannel? _exitChannel;
-static void listenToExitWebSocket(Function(String) onRFIDReceived) {
+  static void listenToExitWebSocket(Function(String) onRFIDReceived) {
   _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
   print("🔗 Connecting to WebSocket (Exit): $wsUrl");
 
@@ -123,7 +123,7 @@ static void listenToExitWebSocket(Function(String) onRFIDReceived) {
 
     try {
       final decoded = jsonDecode(data);
-      if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT') {
+      if (decoded['scanned_uid'] != null) {
         final String uid = decoded['scanned_uid'];
         print("🎯 Exit RFID: $uid");
         onRFIDReceived(uid);
@@ -136,6 +136,7 @@ static void listenToExitWebSocket(Function(String) onRFIDReceived) {
   }, onDone: () {
     print("🔌 Exit WebSocket Closed");
   });
+
 }
 
   // Dispose both WebSocket channels
