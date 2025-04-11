@@ -657,7 +657,7 @@ const server = app.listen(PORT, () => {
 // ====== WebSocket Setup (/ws for both entrance & exit) ======
 function broadcastToClients(message) {
   const data = JSON.stringify(message);
-  expressWs.getWss().clients.forEach((client) => {
+  app.getWss().clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(data);
     }
