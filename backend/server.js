@@ -664,33 +664,34 @@ function broadcastToClients(message) {
   });
 }
 
+// ======== ✅ WebSocket: Unified /ws route ========
 app.ws("/ws", (ws, req) => {
-  console.log("🌐 WebSocket Connected to /ws");
+  console.log("🔓 WebSocket connected: /ws");
 
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
       const uid = data.scanned_uid;
-      const type = (data.type || "").toLowerCase();
+      const type = (data.type || "").toUpperCase();
 
-      if (!uid) return;
+      if (!uid || !type) return;
 
-      if (type === "exit") {
+      if (type === "EXIT") {
         console.log(`📥 EXIT UID: ${uid}`);
         processExitRFID(uid);
-      } else if (type === "entrance" || type === "reservation") {
+      } else if (type === "ENTRANCE") {
         console.log(`📥 ENTRANCE UID: ${uid}`);
         broadcastToClients({ scanned_uid: uid });
       } else {
-        console.warn("⚠️ Unknown WebSocket type received:", type);
+        console.warn(`⚠️ Unknown type received: ${type}`);
       }
     } catch (err) {
-      console.error("❌ WebSocket message error:", err);
+      console.error("❌ Error in /ws:", err);
     }
   });
 
   ws.on("close", () => {
-    console.log("🔌 WebSocket disconnected from /ws");
+    console.log("🔌 WebSocket Disconnected: /ws");
   });
 });
 
