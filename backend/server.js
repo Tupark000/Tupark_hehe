@@ -612,18 +612,19 @@
 //     });
 //   });
 // }, 5000);
+
+
 require("dotenv").config();
 const express = require("express");
+const expressWs = require("express-ws");
 const mysql = require("mysql2");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const moment = require("moment");
-const http = require("http");
 const WebSocket = require("ws");
+const moment = require("moment");
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+expressWs(app);
 
 const PORT = process.env.PORT || 5000;
 
@@ -631,7 +632,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cors());
 
-// MySQL setup
+// ====== MySQL Connection ======
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -642,81 +643,80 @@ const db = mysql.createConnection({
 
 db.connect((err) => {
   if (err) {
-    console.error("❌ DB Error:", err);
+    console.error("❌ Database connection failed:", err);
     return;
   }
-  console.log("✅ Connected to MySQL");
+  console.log("✅ Connected to MySQL database");
 });
 
-// WebSocket clients mapping
-const entranceClients = new Set();
-const exitClients = new Set();
+// ====== Start Server ======
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Express server running at http://localhost:${PORT}`);
+});
 
-// Broadcast function
-function broadcast(set, message) {
-  const msg = JSON.stringify(message);
-  set.forEach((client) => {
+// ====== WebSocket Setup (/ws for both entrance & exit) ======
+function broadcastToClients(message) {
+  const data = JSON.stringify(message);
+  expressWs.getWss().clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
+      client.send(data);
     }
   });
 }
 
-// WebSocket logic
-wss.on("connection", (ws, req) => {
-  const path = req.url;
-
-  console.log(`🔌 New WS connection: ${path}`);
-  if (path === "/ws/entrance") entranceClients.add(ws);
-  else if (path === "/ws/exit") exitClients.add(ws);
+app.ws("/ws", (ws, req) => {
+  console.log("🌐 WebSocket Connected to /ws");
 
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
       const uid = data.scanned_uid;
-      const type = data.type;
+      const type = (data.type || "").toLowerCase();
 
       if (!uid) return;
 
-      if (type && type.toLowerCase() === "exit") {
+      if (type === "exit") {
+        console.log(`📥 EXIT UID: ${uid}`);
         processExitRFID(uid);
+      } else if (type === "entrance" || type === "reservation") {
+        console.log(`📥 ENTRANCE UID: ${uid}`);
+        broadcastToClients({ scanned_uid: uid });
       } else {
-        broadcast(entranceClients, { scanned_uid: uid });
+        console.warn("⚠️ Unknown WebSocket type received:", type);
       }
     } catch (err) {
-      console.error("❌ WS Message Error:", err);
+      console.error("❌ WebSocket message error:", err);
     }
   });
 
   ws.on("close", () => {
-    entranceClients.delete(ws);
-    exitClients.delete(ws);
-    console.log("🔌 WS Disconnected");
+    console.log("🔌 WebSocket disconnected from /ws");
   });
 });
 
-// Process Exit RFID
+// ====== Process Exit ======
 function processExitRFID(rfid_uid) {
   const checkQuery =
     "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
   db.query(checkQuery, [rfid_uid], (err, result) => {
     if (err) return console.error("❌ DB error:", err);
-    if (result.length === 0) return console.log("⚠️ UID already exited or not found.");
+    if (result.length === 0) {
+      console.log("⚠️ UID not found or already exited.");
+      return;
+    }
 
     const updateQuery =
       "UPDATE users SET status = 'INACTIVE', time_out = NOW() WHERE rfid_uid = ?";
     db.query(updateQuery, [rfid_uid], (err2) => {
       if (err2) return console.error("❌ Exit update error:", err2);
       console.log(`✅ RFID ${rfid_uid} marked as INACTIVE`);
-      broadcast(exitClients, { update: "user_exited", rfid_uid });
+      broadcastToClients({ update: "user_exited", rfid_uid });
     });
   });
 }
 
-
 // ========== API Routes ==========
 
-// Login
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
   const query = "SELECT * FROM admins WHERE email = ? AND password = ?";
@@ -730,7 +730,6 @@ app.post("/login", (req, res) => {
   });
 });
 
-// Add User (Entrance)
 app.post("/api/users", (req, res) => {
   const { name, plate_number, rfid_uid } = req.body;
   if (!name || !plate_number || !rfid_uid) {
@@ -752,7 +751,6 @@ app.post("/api/users", (req, res) => {
       INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
       VALUES (?, ?, ?, NOW(), 'ACTIVE')
     `;
-
     db.query(insertQuery, [name, plate_number, rfid_uid], (err2) => {
       if (err2) return res.status(500).json({ message: "Insert failed" });
 
@@ -763,13 +761,11 @@ app.post("/api/users", (req, res) => {
         plate_number,
         rfid_uid,
       });
-
       res.status(201).json({ message: "User added successfully" });
     });
   });
 });
 
-// Get ACTIVE users
 app.get("/api/users", (req, res) => {
   const query =
     "SELECT * FROM users WHERE status = 'ACTIVE' ORDER BY time_in DESC";
@@ -779,7 +775,6 @@ app.get("/api/users", (req, res) => {
   });
 });
 
-// Get INACTIVE users
 app.get("/api/users/inactive", (req, res) => {
   const query =
     "SELECT * FROM users WHERE status = 'INACTIVE' ORDER BY time_out DESC";
@@ -789,7 +784,6 @@ app.get("/api/users/inactive", (req, res) => {
   });
 });
 
-// Manual Exit
 app.post("/api/users/exit", (req, res) => {
   const { rfid_uid } = req.body;
   if (!rfid_uid) return res.status(400).json({ error: "Missing RFID UID" });
@@ -798,7 +792,6 @@ app.post("/api/users/exit", (req, res) => {
   res.status(200).json({ message: "Exit processed" });
 });
 
-// Add Reservation
 app.post("/api/reservations", (req, res) => {
   const { name, plate_number, rfid_uid, expected_time_in } = req.body;
   if (!name || !plate_number || !rfid_uid || !expected_time_in) {
@@ -822,7 +815,6 @@ app.post("/api/reservations", (req, res) => {
   );
 });
 
-// Get all Reservations
 app.get("/api/reservations", (req, res) => {
   const query = "SELECT * FROM reservation ORDER BY expected_time_in DESC";
   db.query(query, (err, results) => {
@@ -831,7 +823,7 @@ app.get("/api/reservations", (req, res) => {
   });
 });
 
-// Reservation Auto Activation
+// ======= Reservation Auto Activation =======
 setInterval(() => {
   const now = new Date();
   const formattedNow = now.toISOString().slice(0, 19).replace("T", " ");
@@ -872,7 +864,3 @@ setInterval(() => {
     });
   });
 }, 5000);
-
-server.listen(PORT, () => {
-  console.log(`🚀 Server + WS listening at http://localhost:${PORT}`);
-});
