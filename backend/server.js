@@ -612,18 +612,18 @@
 //     });
 //   });
 // }, 5000);
-
 require("dotenv").config();
 const express = require("express");
-const expressWs = require("express-ws");
 const mysql = require("mysql2");
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const WebSocket = require("ws");
 const moment = require("moment");
+const http = require("http");
+const WebSocket = require("ws");
 
 const app = express();
-expressWs(app);
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 5000;
 
@@ -631,7 +631,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cors());
 
-// MySQL Connection
+// MySQL setup
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -642,92 +642,77 @@ const db = mysql.createConnection({
 
 db.connect((err) => {
   if (err) {
-    console.error("❌ Database connection failed:", err);
+    console.error("❌ DB Error:", err);
     return;
   }
-  console.log("✅ Connected to MySQL database");
+  console.log("✅ Connected to MySQL");
 });
 
-// Start Express HTTP Server
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Express server running at http://localhost:${PORT}`);
-});
+// WebSocket clients mapping
+const entranceClients = new Set();
+const exitClients = new Set();
 
-// WebSocket broadcasting function
-function broadcastToClients(message) {
-  const data = JSON.stringify(message);
-  expressWs.getWss().clients.forEach((client) => {
+// Broadcast function
+function broadcast(set, message) {
+  const msg = JSON.stringify(message);
+  set.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(data);
+      client.send(msg);
     }
   });
 }
 
-// ======== ✅ WebSocket: /ws/entrance ========
-app.ws("/ws/entrance", (ws, req) => {
-  console.log("🔓 WebSocket connected: ENTRANCE");
+// WebSocket logic
+wss.on("connection", (ws, req) => {
+  const path = req.url;
+
+  console.log(`🔌 New WS connection: ${path}`);
+  if (path === "/ws/entrance") entranceClients.add(ws);
+  else if (path === "/ws/exit") exitClients.add(ws);
 
   ws.on("message", (msg) => {
     try {
       const data = JSON.parse(msg);
       const uid = data.scanned_uid;
+      const type = data.type;
+
       if (!uid) return;
 
-      console.log(`📥 ENTRANCE UID: ${uid}`);
-      broadcastToClients({ scanned_uid: uid });
+      if (type && type.toLowerCase() === "exit") {
+        processExitRFID(uid);
+      } else {
+        broadcast(entranceClients, { scanned_uid: uid });
+      }
     } catch (err) {
-      console.error("❌ Error in /ws/entrance:", err);
+      console.error("❌ WS Message Error:", err);
     }
   });
 
   ws.on("close", () => {
-    console.log("🔌 WebSocket Disconnected: ENTRANCE");
+    entranceClients.delete(ws);
+    exitClients.delete(ws);
+    console.log("🔌 WS Disconnected");
   });
 });
 
-// ======== ✅ WebSocket: /ws/exit ========
-app.ws("/ws/exit", (ws, req) => {
-  console.log("🔓 WebSocket connected: EXIT");
-
-  ws.on("message", (msg) => {
-    try {
-      const data = JSON.parse(msg);
-      const uid = data.scanned_uid;
-      if (!uid) return;
-
-      console.log(`📥 EXIT UID: ${uid}`);
-      processExitRFID(uid);
-    } catch (err) {
-      console.error("❌ Error in /ws/exit:", err);
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("🔌 WebSocket Disconnected: EXIT");
-  });
-});
-
-// ======== EXIT Logic =========
+// Process Exit RFID
 function processExitRFID(rfid_uid) {
   const checkQuery =
     "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
   db.query(checkQuery, [rfid_uid], (err, result) => {
     if (err) return console.error("❌ DB error:", err);
-    if (result.length === 0) {
-      console.log("⚠️ UID not found or already exited.");
-      return;
-    }
+    if (result.length === 0) return console.log("⚠️ UID already exited or not found.");
 
     const updateQuery =
       "UPDATE users SET status = 'INACTIVE', time_out = NOW() WHERE rfid_uid = ?";
     db.query(updateQuery, [rfid_uid], (err2) => {
       if (err2) return console.error("❌ Exit update error:", err2);
-
       console.log(`✅ RFID ${rfid_uid} marked as INACTIVE`);
-      broadcastToClients({ update: "user_exited", rfid_uid });
+      broadcast(exitClients, { update: "user_exited", rfid_uid });
     });
   });
 }
+
 
 // ========== API Routes ==========
 
@@ -887,3 +872,7 @@ setInterval(() => {
     });
   });
 }, 5000);
+
+server.listen(PORT, () => {
+  console.log(`🚀 Server + WS listening at http://localhost:${PORT}`);
+});
