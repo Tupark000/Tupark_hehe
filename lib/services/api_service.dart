@@ -7,9 +7,9 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 class ApiService {
   // Base URL for REST API and WebSockets
-static final String apiUrl = "https://rfid-backend.onrender.com";
-static const String wsEntranceUrl = "wss://rfid-backend.onrender.com/ws/entrance";
-static const String wsExitUrl = "wss://rfid-backend.onrender.com/ws/exit";
+static final String apiUrl = "https://tuparkhehe-production.up.railway.app";
+static const String wsUrl = "wss://tuparkhehe-production.up.railway.app/ws";
+
 
 
   // Fetch all users
@@ -86,10 +86,9 @@ static Future<bool> addUser(String name, String plate, String rfid) async {
 
   // ===== WebSocket for Entrance Scans =====
   static WebSocketChannel? _entranceChannel;
-
- static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
-  _entranceChannel = IOWebSocketChannel.connect(Uri.parse(wsEntranceUrl));
-  print("🔗 Connecting to WebSocket (Entrance): $wsEntranceUrl");
+static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
+  _entranceChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+  print("🔗 Connecting to WebSocket (Entrance): $wsUrl");
 
   _entranceChannel!.stream.listen((data) {
     print("📩 WebSocket (Entrance) Message Received: $data");
@@ -97,12 +96,12 @@ static Future<bool> addUser(String name, String plate, String rfid) async {
     try {
       final decoded = jsonDecode(data);
 
-      if (decoded['scanned_uid'] != null) {
+      if (decoded['scanned_uid'] != null && decoded['type'] == 'ENTRANCE') {
         final uid = decoded['scanned_uid'];
         onRFIDReceived(uid);
       } else if (decoded['update'] == 'reservation_activated') {
         print("🚀 Reservation moved to ACTIVE: ${decoded['rfid_uid']}");
-        onRFIDReceived(decoded['rfid_uid']); // trigger refresh
+        onRFIDReceived(decoded['rfid_uid']);
       }
     } catch (e) {
       print("❌ JSON Parse Error (Entrance): $e");
@@ -117,30 +116,29 @@ static Future<bool> addUser(String name, String plate, String rfid) async {
 
   // ===== WebSocket for Exit Scans =====
   static WebSocketChannel? _exitChannel;
+static void listenToExitWebSocket(Function(String) onRFIDReceived) {
+  _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+  print("🔗 Connecting to WebSocket (Exit): $wsUrl");
 
-  static void listenToExitWebSocket(Function(String) onRFIDReceived) {
-    _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsExitUrl));
-    print("🔗 Connecting to WebSocket (Exit): $wsExitUrl");
+  _exitChannel!.stream.listen((data) {
+    print("📩 WebSocket Message (Exit) Received: $data");
 
-    _exitChannel!.stream.listen((data) {
-      print("📩 WebSocket Message (Exit) Received: $data");
-
-      try {
-        final decoded = jsonDecode(data);
-        if (decoded['scanned_uid'] != null) {
-          final String uid = decoded['scanned_uid'];
-          print("🎯 Exit RFID: $uid");
-          onRFIDReceived(uid);
-        }
-      } catch (e) {
-        print("❌ JSON Parse Error (Exit): $e");
+    try {
+      final decoded = jsonDecode(data);
+      if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT') {
+        final String uid = decoded['scanned_uid'];
+        print("🎯 Exit RFID: $uid");
+        onRFIDReceived(uid);
       }
-    }, onError: (error) {
-      print("❌ WebSocket Error (Exit): $error");
-    }, onDone: () {
-      print("🔌 Exit WebSocket Closed");
-    });
-  }
+    } catch (e) {
+      print("❌ JSON Parse Error (Exit): $e");
+    }
+  }, onError: (error) {
+    print("❌ WebSocket Error (Exit): $error");
+  }, onDone: () {
+    print("🔌 Exit WebSocket Closed");
+  });
+}
 
   // Dispose both WebSocket channels
   static void disposeWebSockets() {
