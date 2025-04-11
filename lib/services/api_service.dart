@@ -125,10 +125,11 @@ static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
 
     try {
       final decoded = jsonDecode(data);
-      if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT') {
-       onRFIDReceived(decoded['scanned_uid']);
-      }
 
+      if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT_SCAN') {
+        final uid = decoded['scanned_uid'];
+        onRFIDReceived(uid);  // Trigger display on UI
+      }
     } catch (e) {
       print("❌ JSON Parse Error (Exit): $e");
     }
@@ -137,8 +138,8 @@ static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
   }, onDone: () {
     print("🔌 Exit WebSocket Closed");
   });
+ }
 
-}
 
   // Dispose both WebSocket channels
   static void disposeWebSockets() {

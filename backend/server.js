@@ -676,17 +676,17 @@ app.ws("/ws", (ws, req) => {
 
       if (!uid || !type) return;
 
-      if (type === "EXIT") {
-        console.log(`📥 EXIT UID: ${uid}`);
-        processExitRFID(uid);
+      if (type === "EXIT_SCAN") {
+        console.log(`📥 EXIT_SCAN UID: ${uid}`);
+        broadcastToClients({ scanned_uid: uid, type: "EXIT_SCAN" }); // Just broadcast, no DB update
       } else if (type === "ENTRANCE") {
         console.log(`📥 ENTRANCE UID: ${uid}`);
-        broadcastToClients({ scanned_uid: uid });
+        broadcastToClients({ scanned_uid: uid, type: "ENTRANCE" });
       } else {
-        console.warn(`⚠️ Unknown type received: ${type}`);
+        console.warn(`⚠️ Unknown WebSocket type: ${type}`);
       }
     } catch (err) {
-      console.error("❌ Error in /ws:", err);
+      console.error("❌ WebSocket Error:", err);
     }
   });
 
