@@ -11,7 +11,7 @@ const moment = require('moment');
 const app = express();
 expressWs(app);
 
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 const WEBSOCKET_PORT = 3001;
 
 app.use(express.json());
@@ -320,5 +320,5 @@ setInterval(() => {
 
 // ⚠️ Make sure this line remains LAST in your server.js
 app.listen(PORT, () => {
-  console.log(`🚀 Express server running at http://192.168.100.96:${PORT}`);
+  console.log(`🚀 Express server running at  http://localhost:${PORT}`);
 });
