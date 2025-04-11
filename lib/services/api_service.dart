@@ -9,6 +9,8 @@ class ApiService {
   // Base URL for REST API and WebSockets
 static final String apiUrl = "https://tuparkhehe-production.up.railway.app";
 static const String wsUrl = "wss://tuparkhehe-production.up.railway.app/ws";
+static const String wsUnifiedUrl = "wss://tuparkhehe-production.up.railway.app/ws";
+
 
   // Fetch all users
   static Future<List<dynamic>> fetchUsers() async {
@@ -115,19 +117,18 @@ static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
   // ===== WebSocket for Exit Scans =====
   static WebSocketChannel? _exitChannel;
   static void listenToExitWebSocket(Function(String) onRFIDReceived) {
-  _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
-  print("🔗 Connecting to WebSocket (Exit): $wsUrl");
+  _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsUnifiedUrl));
+  print("🔗 Connecting to WebSocket (Exit): $wsUnifiedUrl");
 
   _exitChannel!.stream.listen((data) {
     print("📩 WebSocket Message (Exit) Received: $data");
 
     try {
       final decoded = jsonDecode(data);
-      if (decoded['scanned_uid'] != null) {
-        final String uid = decoded['scanned_uid'];
-        print("🎯 Exit RFID: $uid");
-        onRFIDReceived(uid);
+      if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT') {
+       onRFIDReceived(decoded['scanned_uid']);
       }
+
     } catch (e) {
       print("❌ JSON Parse Error (Exit): $e");
     }

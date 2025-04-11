@@ -836,10 +836,12 @@ setInterval(() => {
     results.forEach((resv) => {
       const { name, plate_number, rfid_uid, expected_time_in } = resv;
 
-      const checkQuery =
-        "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+      // Make sure the user doesn't already exist as ACTIVE or INACTIVE
+      const checkQuery = "SELECT * FROM users WHERE rfid_uid = ?";
       db.query(checkQuery, [rfid_uid], (checkErr, checkResult) => {
-        if (checkErr || checkResult.length > 0) return;
+        if (checkErr || checkResult.length > 0) return;  // Do nothing if UID exists
+
+        
 
         const insertQuery = `
           INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
