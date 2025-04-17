@@ -1,43 +1,179 @@
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'dart:typed_data';
 
+// import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+
+// class PrinterService {
+//   final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
+//   BluetoothDevice? _selectedPrinter;
+
+//   Future<List<BluetoothDevice>> scanForPrinters() async {
+//     return await _bluetooth.getBondedDevices();
+//   }
+
+//   Future<void> connectToPrinter(BluetoothDevice device) async {
+//     await _bluetooth.connect(device);
+//     _selectedPrinter = device;
+//   }
+
+//   void disconnect() {
+//     _bluetooth.disconnect();
+//     _selectedPrinter = null;
+//   }
+
+//   Future<void> printReceipt({
+//     required String userName,
+//     required String plateNumber,
+//     required String rfid,
+//     required String timeOut,
+//   }) async {
+//     if (_selectedPrinter == null) {
+//       print("⚠️ No printer selected.");
+//       return;
+//     }
+
+//     _bluetooth.printNewLine();
+//     _bluetooth.printCustom("=== TUPark Receipt ===", 3, 1);
+//     _bluetooth.printNewLine();
+//     _bluetooth.printLeftRight("Name", userName, 1);
+//     _bluetooth.printLeftRight("Plate No.", plateNumber, 1);
+//     _bluetooth.printLeftRight("RFID UID", rfid, 1);
+//     _bluetooth.printLeftRight("Time Out", timeOut, 1);
+//     _bluetooth.printNewLine();
+//     _bluetooth.printCustom("=====================", 1, 1);
+//     _bluetooth.printNewLine();
+//     _bluetooth.paperCut();
+//   }
+// }
+
+
+// import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+
+// class PrinterService {
+//   final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
+//   BluetoothDevice? _selectedPrinter;
+
+//   bool isConnected = false;
+
+//   PrinterService() {
+//     _bluetooth.onStateChanged().listen((state) {
+//       if (state == BlueThermalPrinter.CONNECTED) {
+//         isConnected = true;
+//         print("✅ Printer connected");
+//       } else if (state == BlueThermalPrinter.DISCONNECTED) {
+//         isConnected = false;
+//         print("❌ Printer disconnected");
+//       }
+//     });
+//   }
+
+//   Future<List<BluetoothDevice>> scanForPrinters() async {
+//     return await _bluetooth.getBondedDevices();
+//   }
+
+//   Future<void> connectToPrinter(BluetoothDevice device) async {
+//     bool isAlreadyConnected = await _bluetooth.isConnected ?? false;
+//     if (!isAlreadyConnected) {
+//       await _bluetooth.connect(device);
+//     }
+//     _selectedPrinter = device;
+//   }
+
+//   void disconnect() {
+//     _bluetooth.disconnect();
+//     _selectedPrinter = null;
+//     isConnected = false;
+//   }
+
+//   Future<void> printReceipt({
+//     required String userName,
+//     required String plateNumber,
+//     required String rfid,
+//     required String timeOut,
+//   }) async {
+//     bool connected = await _bluetooth.isConnected ?? false;
+
+//     if (!connected) {
+//       print("⚠️ Not connected to printer. Please connect first.");
+//       return;
+//     }
+
+//     try {
+//       _bluetooth.printNewLine();
+//       _bluetooth.printCustom("=== TUPark Receipt ===", 3, 1);
+//       _bluetooth.printNewLine();
+//       _bluetooth.printLeftRight("Name", userName, 1);
+//       _bluetooth.printLeftRight("Plate No.", plateNumber, 1);
+//       _bluetooth.printLeftRight("RFID UID", rfid, 1);
+//       _bluetooth.printLeftRight("Time Out", timeOut, 1);
+//       _bluetooth.printNewLine();
+//       _bluetooth.printCustom("=====================", 1, 1);
+//       _bluetooth.printNewLine();
+//       _bluetooth.paperCut();
+
+//       print("🖨️ Receipt sent to printer.");
+//     } catch (e) {
+//       print("❌ Print failed: \$e");
+//     }
+//   }
+// }
+
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 
 class PrinterService {
-  BluetoothConnection? _connection;
+  final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
+  BluetoothDevice? _selectedPrinter;
+  bool isConnected = false;
 
-  // Connect to the printer via Bluetooth
-  Future<bool> connectToPrinter(String address) async {
-    try {
-      _connection = await BluetoothConnection.toAddress(address);
-      print('✅ Connected to the printer at $address');
-      return true;
-    } catch (e) {
-      print('❌ Failed to connect to printer: $e');
-      return false;
-    }
+  PrinterService() {
+    _bluetooth.onStateChanged().listen((state) {
+      if (state == BlueThermalPrinter.CONNECTED) {
+        isConnected = true;
+        print("✅ Printer connected");
+      } else if (state == BlueThermalPrinter.DISCONNECTED) {
+        isConnected = false;
+        print("❌ Printer disconnected");
+      }
+    });
   }
 
-  // Send a simple receipt to the printer
-  Future<void> printReceipt(String rfid, String plateNumber, String timeOut) async {
-    if (_connection != null && _connection!.isConnected) {
-      String receipt = """
-======== TUPark Receipt ========
-RFID UID: $rfid
-Plate No: $plateNumber
-Time Out: $timeOut
-==============================
-""";
-      _connection!.output.add(Uint8List.fromList(receipt.codeUnits));
-      await _connection!.output.allSent;
-    } else {
-      print("❌ Printer not connected.");
-    }
+  Future<List<BluetoothDevice>> scanForPrinters() async {
+    return await _bluetooth.getBondedDevices();
   }
 
-  // Disconnect from the printer
+  Future<void> connectToPrinter(BluetoothDevice device) async {
+    await _bluetooth.connect(device);
+    _selectedPrinter = device;
+  }
+
   void disconnect() {
-    _connection?.dispose();
-    _connection = null;
-    print('🔌 Disconnected from printer.');
+    _bluetooth.disconnect();
+  }
+
+  Future<void> printReceipt({
+    required String userName,
+    required String plateNumber,
+    required String rfid,
+    required String timeOut,
+  }) async {
+    // Attempt reconnect if not connected
+    if (!isConnected && _selectedPrinter != null) {
+      print("🔁 Reconnecting to printer...");
+      await connectToPrinter(_selectedPrinter!);
+    }
+
+    if (!isConnected) {
+      print("⚠️ Printer not connected. Cannot print.");
+      return;
+    }
+
+    _bluetooth.printNewLine();
+    _bluetooth.printCustom("=== TUPark Receipt ===", 3, 1);
+    _bluetooth.printNewLine();
+    _bluetooth.printLeftRight("Name", userName, 1);
+    _bluetooth.printLeftRight("Plate No.", plateNumber, 1);
+    _bluetooth.printLeftRight("RFID UID", rfid, 1);
+    _bluetooth.printLeftRight("Time Out", timeOut, 1);
+    _bluetooth.printNewLine();
+    _bluetooth.printCustom("=====================", 1, 1);
+    _bluetooth.printNewLine();
   }
 }

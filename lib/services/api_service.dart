@@ -184,7 +184,6 @@ static Future<bool> addReservation({
 }
 
 
-
 static Future<List<dynamic>> fetchReservations() async {
   final response = await http.get(Uri.parse("$apiUrl/api/reservations"));
   if (response.statusCode == 200) {
@@ -193,6 +192,27 @@ static Future<List<dynamic>> fetchReservations() async {
     throw Exception("Failed to load reservations");
   }
 }
+
+static Future<Map<String, dynamic>?> fetchUserDetails(String rfid) async {
+  try {
+    final url = '$apiUrl/api/users/$rfid';
+    print("📡 Fetching user details from: $url");
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      print("✅ User data: ${response.body}");
+      return jsonDecode(response.body);
+    } else {
+      print("❌ No active user found. Status: ${response.statusCode}");
+      return null;
+    }
+  } catch (e) {
+    print("❌ Error fetching user: $e");
+    return null;
+  }
+}
+
 
 
 

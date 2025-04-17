@@ -823,6 +823,24 @@ app.get("/api/reservations", (req, res) => {
   });
 });
 
+app.get("/api/users/:rfid_uid", (req, res) => {
+  const { rfid_uid } = req.params;
+  const query = `
+    SELECT * FROM users
+    WHERE rfid_uid = ? 
+    ORDER BY time_in DESC LIMIT 1
+  `;
+  db.query(query, [rfid_uid], (err, results) => {
+    if (err) return res.status(500).json({ error: "Database error" });
+    if (results.length === 0) return res.status(404).json({ error: "No active user found" });
+    res.status(200).json(results[0]);
+  });
+});
+
+
+
+
+
 // ======= Reservation Auto Activation =======
 setInterval(() => {
   const now = new Date();

@@ -108,9 +108,10 @@
 //   }
 // }
 
+
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import '../services/printer_service.dart'; // Make sure this is implemented properly
+import '../services/printer_service.dart';
 
 class ExitPage extends StatefulWidget {
   @override
@@ -121,20 +122,34 @@ class _ExitPageState extends State<ExitPage> {
   String scannedRFID = "Waiting for RFID scan...";
   bool isConfirmingExit = false;
   String? lastRFID;
+  String? userName;
+  String? plateNumber;
 
-  final PrinterService _printerService = PrinterService(); // Instance to access non-static method
+  final PrinterService _printerService = PrinterService();
 
   @override
   void initState() {
     super.initState();
 
-    ApiService.listenToExitWebSocket((rfid) {
+    ApiService.listenToExitWebSocket((rfid) async {
       print("🔄 Scanned Exit RFID: $rfid");
       if (rfid != lastRFID) {
-        setState(() {
-          scannedRFID = "RFID: $rfid";
-          lastRFID = rfid;
-        });
+
+        final user = await ApiService.fetchUserDetails(rfid);
+        if (user != null) {
+          setState(() {
+            scannedRFID = "RFID: $rfid";
+            lastRFID = rfid;
+            userName = user['name'];
+            plateNumber = user['plate_number'];
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("⚠️ No ACTIVE user found for RFID: $rfid")),
+          );
+        }
+
+
       }
     });
   }
@@ -142,23 +157,23 @@ class _ExitPageState extends State<ExitPage> {
   @override
   void dispose() {
     ApiService.disposeWebSockets();
-    _printerService.disconnect(); // Disconnect printer if still connected
+    // Do NOT disconnect the printer to keep persistent connection
     super.dispose();
   }
 
   void confirmExit() async {
-    if (lastRFID == null) {
+    if (lastRFID == null || userName == null || plateNumber == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("⚠️ No RFID scanned! Please scan an RFID first.")),
+        SnackBar(content: Text("⚠️ Please scan a valid ACTIVE user first.")),
       );
       return;
     }
 
-    final confirm = await showDialog(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text("Confirm Exit"),
-        content: Text("Do you want to proceed with exiting UID: $lastRFID?"),
+        content: Text("Exit for UID: $lastRFID\nName: $userName\nPlate: $plateNumber"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text("Cancel")),
           ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text("Confirm Exit")),
@@ -176,11 +191,11 @@ class _ExitPageState extends State<ExitPage> {
 
     final success = await ApiService.exitUser(rfid);
     if (success) {
-      final wantPrint = await showDialog(
+      final wantPrint = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text("Print Receipt"),
-          content: Text("Do you want to print a receipt for UID: $rfid?"),
+          content: Text("Do you want to print a receipt for:\n$userName / $plateNumber?"),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: Text("No")),
             ElevatedButton(onPressed: () => Navigator.pop(context, true), child: Text("Yes")),
@@ -189,11 +204,13 @@ class _ExitPageState extends State<ExitPage> {
       );
 
       if (wantPrint == true) {
-        // Use placeholder info for now or update if user/vehicle data is fetched
-        const plate = "placeholderPlate";
         final timeOut = DateTime.now().toString();
-
-        await _printerService.printReceipt(rfid, plate, timeOut);
+        await _printerService.printReceipt(
+          userName: userName ?? "Unknown",
+          plateNumber: plateNumber ?? "Unknown",
+          rfid: rfid,
+          timeOut: timeOut,
+        );
       }
 
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("✅ Exit successful!")));
@@ -217,11 +234,23 @@ class _ExitPageState extends State<ExitPage> {
               scannedRFID,
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+            SizedBox(height: 8),
+            if (userName != null && plateNumber != null)
+              Column(
+                children: [
+                  Text("Name: $userName", style: TextStyle(fontSize: 16)),
+                  Text("Plate: $plateNumber", style: TextStyle(fontSize: 16)),
+                ],
+              ),
             SizedBox(height: 20),
             ElevatedButton.icon(
               icon: Icon(Icons.exit_to_app),
               label: Text("Confirm Exit"),
               onPressed: isConfirmingExit ? null : confirmExit,
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                backgroundColor: Colors.blueAccent,
+              ),
             ),
           ],
         ),
