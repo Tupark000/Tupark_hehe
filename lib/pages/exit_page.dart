@@ -125,7 +125,7 @@ class _ExitPageState extends State<ExitPage> {
   String? userName;
   String? plateNumber;
 
-  final PrinterService _printerService = PrinterService();
+  final PrinterService _printerService = PrinterService(); // Singleton is preserved
 
   @override
   void initState() {

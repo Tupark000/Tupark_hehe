@@ -115,15 +115,13 @@
 //     }
 //   }
 // }
-
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 
 class PrinterService {
-  final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
-  BluetoothDevice? _selectedPrinter;
-  bool isConnected = false;
+  static final PrinterService _instance = PrinterService._internal();
+  factory PrinterService() => _instance;
 
-  PrinterService() {
+  PrinterService._internal() {
     _bluetooth.onStateChanged().listen((state) {
       if (state == BlueThermalPrinter.CONNECTED) {
         isConnected = true;
@@ -135,56 +133,46 @@ class PrinterService {
     });
   }
 
+  final BlueThermalPrinter _bluetooth = BlueThermalPrinter.instance;
+  bool isConnected = false;
+
   Future<List<BluetoothDevice>> scanForPrinters() async {
     return await _bluetooth.getBondedDevices();
   }
 
   Future<void> connectToPrinter(BluetoothDevice device) async {
     await _bluetooth.connect(device);
-    _selectedPrinter = device;
   }
 
   void disconnect() {
     _bluetooth.disconnect();
   }
-Future<void> printReceipt({
-  required String userName,
-  required String plateNumber,
-  required String rfid,
-  required String timeOut,
-}) async {
-  try {
-    // Re-scan and connect if not connected
+
+  Future<void> printReceipt({
+    required String userName,
+    required String plateNumber,
+    required String rfid,
+    required String timeOut,
+  }) async {
     if (!isConnected) {
-      print("🔍 Printer not connected. Scanning...");
-      final printers = await scanForPrinters();
-      if (printers.isNotEmpty) {
-        await connectToPrinter(printers.first);
-        print("✅ Auto-connected to printer: ${printers.first.name}");
-        await Future.delayed(Duration(seconds: 2)); // small delay for stability
-      } else {
-        print("❌ No paired printers found.");
-        return;
-      }
+      print("🧻 Printer not connected. Skipping print.");
+      return;
     }
 
-    // Now print
-    _bluetooth.printNewLine();
-    _bluetooth.printCustom("=== TUPark Receipt ===", 3, 1);
-    _bluetooth.printNewLine();
-    _bluetooth.printLeftRight("Name", userName, 1);
-    _bluetooth.printLeftRight("Plate No.", plateNumber, 1);
-    _bluetooth.printLeftRight("RFID UID", rfid, 1);
-    _bluetooth.printLeftRight("Time Out", timeOut, 1);
-    _bluetooth.printNewLine();
-    _bluetooth.printCustom("=====================", 1, 1);
-    _bluetooth.printNewLine();
-
-    print("🖨️ Printed successfully.");
-  } catch (e) {
-    print("❌ Printing failed: $e");
+    try {
+      _bluetooth.printNewLine();
+      _bluetooth.printCustom("=== TUPark Receipt ===", 3, 1);
+      _bluetooth.printNewLine();
+      _bluetooth.printLeftRight("Name", userName, 1);
+      _bluetooth.printLeftRight("Plate No.", plateNumber, 1);
+      _bluetooth.printLeftRight("RFID UID", rfid, 1);
+      _bluetooth.printLeftRight("Time Out", timeOut, 1);
+      _bluetooth.printNewLine();
+      _bluetooth.printCustom("=====================", 1, 1);
+      _bluetooth.printNewLine();
+      print("✅ Printed successfully");
+    } catch (e) {
+      print("❌ Print failed: $e");
+    }
   }
-}
-
-
 }
