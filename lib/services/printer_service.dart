@@ -147,24 +147,28 @@ class PrinterService {
   void disconnect() {
     _bluetooth.disconnect();
   }
-
-  Future<void> printReceipt({
-    required String userName,
-    required String plateNumber,
-    required String rfid,
-    required String timeOut,
-  }) async {
-    // Attempt reconnect if not connected
-    if (!isConnected && _selectedPrinter != null) {
-      print("🔁 Reconnecting to printer...");
-      await connectToPrinter(_selectedPrinter!);
-    }
-
+Future<void> printReceipt({
+  required String userName,
+  required String plateNumber,
+  required String rfid,
+  required String timeOut,
+}) async {
+  try {
+    // Re-scan and connect if not connected
     if (!isConnected) {
-      print("⚠️ Printer not connected. Cannot print.");
-      return;
+      print("🔍 Printer not connected. Scanning...");
+      final printers = await scanForPrinters();
+      if (printers.isNotEmpty) {
+        await connectToPrinter(printers.first);
+        print("✅ Auto-connected to printer: ${printers.first.name}");
+        await Future.delayed(Duration(seconds: 2)); // small delay for stability
+      } else {
+        print("❌ No paired printers found.");
+        return;
+      }
     }
 
+    // Now print
     _bluetooth.printNewLine();
     _bluetooth.printCustom("=== TUPark Receipt ===", 3, 1);
     _bluetooth.printNewLine();
@@ -175,5 +179,12 @@ class PrinterService {
     _bluetooth.printNewLine();
     _bluetooth.printCustom("=====================", 1, 1);
     _bluetooth.printNewLine();
+
+    print("🖨️ Printed successfully.");
+  } catch (e) {
+    print("❌ Printing failed: $e");
   }
+}
+
+
 }
