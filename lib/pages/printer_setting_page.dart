@@ -78,6 +78,84 @@
 //   }
 // }
 
+// import 'package:flutter/material.dart';
+// import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+// import '../services/printer_service.dart';
+
+// class PrinterSettingPage extends StatefulWidget {
+//   @override
+//   _PrinterSettingPageState createState() => _PrinterSettingPageState();
+// }
+
+// class _PrinterSettingPageState extends State<PrinterSettingPage> {
+//   final PrinterService _printerService = PrinterService();
+//   List<BluetoothDevice> devices = [];
+//   BluetoothDevice? selectedDevice;
+//   bool isLoading = false;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadBondedPrinters();
+//   }
+
+//   Future<void> _loadBondedPrinters() async {
+//     setState(() => isLoading = true);
+//     try {
+//       final result = await _printerService.scanForPrinters();
+//       setState(() {
+//         devices = result;
+//         isLoading = false;
+//       });
+//     } catch (e) {
+//       print("❌ Failed to scan: $e");
+//       setState(() => isLoading = false);
+//     }
+//   }
+
+//   void _connectToDevice(BluetoothDevice device) async {
+//     try {
+//       await _printerService.connectToPrinter(device);
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text("✅ Connected to ${device.name}")),
+//       );
+//       setState(() => selectedDevice = device);
+//     } catch (e) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text("❌ Connection failed: $e")),
+//       );
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: Text('Printer Settings'),
+//         centerTitle: true,
+//       ),
+//       body: isLoading
+//           ? Center(child: CircularProgressIndicator())
+//           : devices.isEmpty
+//               ? Center(child: Text("No bonded printers found."))
+//               : ListView.builder(
+//                   itemCount: devices.length,
+//                   itemBuilder: (context, index) {
+//                     final device = devices[index];
+//                     return ListTile(
+//                       title: Text(device.name ?? "Unknown Device"),
+//                       subtitle: Text(device.address ?? ""),
+//                       trailing: selectedDevice?.address == device.address
+//                           ? Icon(Icons.check_circle, color: Colors.green)
+//                           : null,
+//                       onTap: () => _connectToDevice(device),
+//                     );
+//                   },
+//                 ),
+//     );
+//   }
+// }
+
 import 'package:flutter/material.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import '../services/printer_service.dart';
@@ -132,26 +210,62 @@ class _PrinterSettingPageState extends State<PrinterSettingPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Printer Settings'),
+        backgroundColor: Colors.red[400],
+        foregroundColor: Colors.white,
         centerTitle: true,
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : devices.isEmpty
-              ? Center(child: Text("No bonded printers found."))
-              : ListView.builder(
-                  itemCount: devices.length,
-                  itemBuilder: (context, index) {
-                    final device = devices[index];
-                    return ListTile(
-                      title: Text(device.name ?? "Unknown Device"),
-                      subtitle: Text(device.address ?? ""),
-                      trailing: selectedDevice?.address == device.address
-                          ? Icon(Icons.check_circle, color: Colors.green)
-                          : null,
-                      onTap: () => _connectToDevice(device),
-                    );
-                  },
-                ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: isLoading
+            ? Center(child: CircularProgressIndicator())
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    "Available Bonded Printers",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.red[700],
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Expanded(
+                    child: devices.isEmpty
+                        ? Center(
+                            child: Text(
+                              "No bonded printers found.",
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        : ListView.separated(
+                            itemCount: devices.length,
+                            separatorBuilder: (_, __) => SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final device = devices[index];
+                              final isSelected = selectedDevice?.address == device.address;
+
+                              return ListTile(
+                                tileColor: isSelected
+                                    ? Colors.red[100]
+                                    : Colors.grey[100],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                leading: Icon(Icons.print, color: Colors.red[300]),
+                                title: Text(device.name ?? "Unknown Device"),
+                                subtitle: Text(device.address ?? ""),
+                                trailing: isSelected
+                                    ? Icon(Icons.check_circle, color: Colors.green)
+                                    : null,
+                                onTap: () => _connectToDevice(device),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }
