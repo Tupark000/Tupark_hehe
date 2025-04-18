@@ -155,7 +155,6 @@
 //     );
 //   }
 // }
-
 import 'package:flutter/material.dart';
 import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import '../services/printer_service.dart';
@@ -203,6 +202,16 @@ class _PrinterSettingPageState extends State<PrinterSettingPage> {
         SnackBar(content: Text("❌ Connection failed: $e")),
       );
     }
+  }
+
+  void _disconnectPrinter() {
+    _printerService.disconnect();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("🔌 Printer disconnected")),
+    );
+    setState(() {
+      selectedDevice = null;
+    });
   }
 
   @override
@@ -263,6 +272,22 @@ class _PrinterSettingPageState extends State<PrinterSettingPage> {
                             },
                           ),
                   ),
+                  if (selectedDevice != null) ...[
+                    SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: _disconnectPrinter,
+                      icon: Icon(Icons.cancel),
+                      label: Text("Disconnect Printer"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red[400],
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ]
                 ],
               ),
       ),
