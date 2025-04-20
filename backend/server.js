@@ -697,24 +697,33 @@ app.ws("/ws", (ws, req) => {
 
 // ====== Process Exit ======
 function processExitRFID(rfid_uid) {
-  const checkQuery =
-    "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+  const checkQuery = `
+    SELECT * FROM users 
+    WHERE rfid_uid = ? AND status = 'ACTIVE' 
+    ORDER BY time_in DESC LIMIT 1
+  `;
+
   db.query(checkQuery, [rfid_uid], (err, result) => {
     if (err) return console.error("❌ DB error:", err);
     if (result.length === 0) {
-      console.log("⚠️ UID not found or already exited.");
+      console.log("⚠️ No ACTIVE record found for RFID:", rfid_uid);
       return;
     }
 
-    const updateQuery =
-      "UPDATE users SET status = 'INACTIVE', time_out = NOW() WHERE rfid_uid = ?";
-    db.query(updateQuery, [rfid_uid], (err2) => {
+    const userId = result[0].id; // assuming you have an `id` column as a unique primary key
+    const updateQuery = `
+      UPDATE users SET status = 'INACTIVE', time_out = NOW()
+      WHERE id = ?
+    `;
+
+    db.query(updateQuery, [userId], (err2) => {
       if (err2) return console.error("❌ Exit update error:", err2);
-      console.log(`✅ RFID ${rfid_uid} marked as INACTIVE`);
+      console.log(`✅ RFID ${rfid_uid} (user ID ${userId}) marked as INACTIVE`);
       broadcastToClients({ update: "user_exited", rfid_uid });
     });
   });
 }
+
 
 // ========== API Routes ==========
 
