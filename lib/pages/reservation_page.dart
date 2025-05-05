@@ -157,7 +157,6 @@
 //     );
 //   }
 // }
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
@@ -175,6 +174,7 @@ class _ReservationPageState extends State<ReservationPage> {
   DateTime? _selectedDateTime;
   String scannedRFID = "Waiting for scan...";
   String? lastRFID;
+  String? vehicleType; // ✅ Vehicle type field
 
   @override
   void initState() {
@@ -226,9 +226,10 @@ class _ReservationPageState extends State<ReservationPage> {
     if (_nameController.text.isEmpty ||
         _plateController.text.isEmpty ||
         lastRFID == null ||
-        _selectedDateTime == null) {
+        _selectedDateTime == null ||
+        vehicleType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Please fill all fields and scan an RFID.")),
+        const SnackBar(content: Text("⚠️ Please fill all fields, scan RFID, and select vehicle type.")),
       );
       return;
     }
@@ -238,6 +239,7 @@ class _ReservationPageState extends State<ReservationPage> {
       plate: _plateController.text.trim(),
       rfid: lastRFID!,
       expectedTime: _selectedDateTime!.toIso8601String(),
+      vehicleType: vehicleType!, // ✅ Include vehicle type
     );
 
     if (success) {
@@ -249,6 +251,7 @@ class _ReservationPageState extends State<ReservationPage> {
       setState(() {
         scannedRFID = "Waiting for scan...";
         lastRFID = null;
+        vehicleType = null;
         _selectedDateTime = null;
       });
     } else {
@@ -280,7 +283,6 @@ class _ReservationPageState extends State<ReservationPage> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
-            // Name Field
             TextField(
               controller: _nameController,
               decoration: InputDecoration(
@@ -293,7 +295,6 @@ class _ReservationPageState extends State<ReservationPage> {
             ),
             const SizedBox(height: 16),
 
-            // Plate Field
             TextField(
               controller: _plateController,
               decoration: InputDecoration(
@@ -304,9 +305,30 @@ class _ReservationPageState extends State<ReservationPage> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // ✅ Vehicle Type Dropdown
+            DropdownButtonFormField<String>(
+              value: vehicleType,
+              decoration: InputDecoration(
+                labelText: "Vehicle Type",
+                filled: true,
+                fillColor: Colors.red[50],
+                prefixIcon: const Icon(Icons.two_wheeler),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              items: ["Motorcycle", "Car"].map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Text(type),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() => vehicleType = value);
+              },
+            ),
             const SizedBox(height: 20),
 
-            // Date & Time
             ListTile(
               tileColor: Colors.red[50],
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -319,7 +341,6 @@ class _ReservationPageState extends State<ReservationPage> {
             ),
             const SizedBox(height: 30),
 
-            // RFID Container
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -346,7 +367,6 @@ class _ReservationPageState extends State<ReservationPage> {
             ),
             const SizedBox(height: 40),
 
-            // Submit Button
             ElevatedButton.icon(
               onPressed: _submitReservation,
               icon: const Icon(Icons.save),

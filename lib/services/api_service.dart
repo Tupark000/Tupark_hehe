@@ -35,7 +35,8 @@ static const String wsUnifiedUrl = "wss://tuparkhehe-production.up.railway.app/w
   }
 
   // Add a new user
-static Future<bool> addUser(String name, String plate, String rfid) async {
+// ✅ Updated Add User method with vehicle_type
+static Future<bool> addUser(String name, String plate, String rfid, String vehicleType) async {
   if (rfid == "Waiting..." || rfid.isEmpty) {
     print("⚠️ No valid RFID scanned.");
     return false;
@@ -48,6 +49,7 @@ static Future<bool> addUser(String name, String plate, String rfid) async {
       'name': name,
       'plate_number': plate,
       'rfid_uid': rfid,
+      'vehicle_type': vehicleType,  // ✅ Added field
     }),
   );
 
@@ -62,6 +64,7 @@ static Future<bool> addUser(String name, String plate, String rfid) async {
     return false;
   }
 }
+
 
   // Exit a user manually via REST API
   static Future<bool> exitUser(String rfid) async {
@@ -163,11 +166,13 @@ static Future<List<dynamic>> fetchInactiveUsers() async {
 }
 
 
+// ✅ Updated Reservation Add method with vehicle_type
 static Future<bool> addReservation({
   required String name,
   required String plate,
   required String rfid,
   required String expectedTime,
+  required String vehicleType,  // ✅ Added field
 }) async {
   final response = await http.post(
     Uri.parse('$apiUrl/api/reservations'),
@@ -177,11 +182,13 @@ static Future<bool> addReservation({
       'plate_number': plate,
       'rfid_uid': rfid,
       'expected_time_in': expectedTime,
+      'vehicle_type': vehicleType,  // ✅ Included
     }),
   );
 
   return response.statusCode == 201;
 }
+
 
 
 static Future<List<dynamic>> fetchReservations() async {

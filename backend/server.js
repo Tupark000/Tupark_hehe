@@ -741,7 +741,7 @@ app.post("/login", (req, res) => {
 });
 
 app.post("/api/users", (req, res) => {
-  const { name, plate_number, rfid_uid } = req.body;
+  const { name, plate_number, rfid_uid, vehicle_type } = req.body;
   if (!name || !plate_number || !rfid_uid) {
     return res.status(400).json({ message: "Missing required fields" });
   }
@@ -758,10 +758,11 @@ app.post("/api/users", (req, res) => {
     }
 
     const insertQuery = `
-      INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
-      VALUES (?, ?, ?, NOW(), 'ACTIVE')
-    `;
-    db.query(insertQuery, [name, plate_number, rfid_uid], (err2) => {
+    INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
+    VALUES (?, ?, ?, ?, NOW(), 'ACTIVE')
+  `;
+  db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type], (err2) => {
+
       if (err2) return res.status(500).json({ message: "Insert failed" });
 
       console.log(`✅ Added user ${name} with RFID ${rfid_uid}`);
@@ -803,19 +804,19 @@ app.post("/api/users/exit", (req, res) => {
 });
 
 app.post("/api/reservations", (req, res) => {
-  const { name, plate_number, rfid_uid, expected_time_in } = req.body;
-  if (!name || !plate_number || !rfid_uid || !expected_time_in) {
+  const { name, plate_number, rfid_uid, vehicle_type, expected_time_in } = req.body;
+  if (!name || !plate_number || !rfid_uid || !vehicle_type || !expected_time_in) {
     return res.status(400).json({ error: "Missing reservation fields" });
   }
 
-  const insertQuery = `
-    INSERT INTO reservation (name, plate_number, rfid_uid, expected_time_in)
-    VALUES (?, ?, ?, ?)
+    const insertQuery = `
+    INSERT INTO reservation (name, plate_number, rfid_uid, vehicle_type, expected_time_in)
+    VALUES (?, ?, ?, ?, ?)
   `;
 
   db.query(
     insertQuery,
-    [name, plate_number, rfid_uid, expected_time_in],
+    [name, plate_number, rfid_uid, vehicle_type, expected_time_in],
     (err) => {
       if (err) return res.status(500).json({ error: "Failed to add reservation" });
 
@@ -824,6 +825,7 @@ app.post("/api/reservations", (req, res) => {
     }
   );
 });
+
 app.get("/api/reservations", (req, res) => {
   const query = "SELECT * FROM reservation ORDER BY expected_time_in DESC";
   db.query(query, (err, results) => {
@@ -834,7 +836,7 @@ app.get("/api/reservations", (req, res) => {
 
 app.get("/api/users/:rfid_uid", (req, res) => {
   const { rfid_uid } = req.params;
-  const query = `
+  const query = ` 
     SELECT * FROM users
     WHERE rfid_uid = ? 
     ORDER BY time_in DESC LIMIT 1
@@ -861,22 +863,21 @@ setInterval(() => {
     if (err) return;
 
     results.forEach((resv) => {
-      const { name, plate_number, rfid_uid, expected_time_in } = resv;
+      const { name, plate_number, rfid_uid, expected_time_in, vehicle_type } = resv;
 
       // Make sure the user doesn't already exist as ACTIVE or INACTIVE
       const checkQuery = "SELECT * FROM users WHERE rfid_uid = ?";
       db.query(checkQuery, [rfid_uid], (checkErr, checkResult) => {
         if (checkErr || checkResult.length > 0) return;  // Do nothing if UID exists
 
-        
 
         const insertQuery = `
-          INSERT INTO users (name, plate_number, rfid_uid, time_in, status)
-          VALUES (?, ?, ?, ?, 'ACTIVE')
+          INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
+          VALUES (?, ?, ?, ?, ?, 'ACTIVE')
         `;
         db.query(
           insertQuery,
-          [name, plate_number, rfid_uid, expected_time_in],
+          [name, plate_number, rfid_uid, vehicle_type, expected_time_in],
           (insertErr) => {
             if (insertErr) return;
 
@@ -890,6 +891,6 @@ setInterval(() => {
           }
         );
       });
-    });
+    }); 
   });
 }, 5000);

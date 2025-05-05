@@ -153,6 +153,7 @@
 //     );
 //   }
 // }
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
@@ -359,6 +360,8 @@ class _ExitDashboardPageState extends State<ExitDashboardPage> {
                                       style: TextStyle(fontSize: 12, color: Colors.grey[700])),
                                   Text("Plate: ${user['plate_number']}",
                                       style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                                  Text("Vehicle: ${user['vehicle_type'] ?? '—'}",
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[700])), // ✅ NEW LINE
                                   Text("Time Out: ${user['time_out'] ?? '—'}",
                                       style: TextStyle(fontSize: 12, color: Colors.grey[600])),
                                 ],

@@ -191,23 +191,27 @@ class _DashboardPageState extends State<DashboardPage> {
                               user['name'],
                               style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'RFID: ${user['rfid_uid']}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                Text(
-                                  'Plate: ${user['plate_number']}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                                Text(
-                                  'Time In: ${user['time_in'] ?? ''}',
-                                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                ),
-                              ],
-                            ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'RFID: ${user['rfid_uid']}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                      Text(
+                                        'Plate: ${user['plate_number']}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                      Text(
+                                        'Vehicle: ${user['vehicle_type'] ?? "—"}', // ✅ Vehicle type added
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                      Text(
+                                        'Time In: ${user['time_in'] ?? ''}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
                           ),
                         );
                       },
