@@ -152,7 +152,7 @@ class InitialPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("TUPark Initial Page:>"),
+        title: const Text("TUPark"),
         centerTitle: true,
         backgroundColor: Colors.white,
         foregroundColor: redColor,  
