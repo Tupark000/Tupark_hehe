@@ -465,24 +465,63 @@ app.post("/api/users/exit", (req, res) => {
   res.status(200).json({ message: "Exit processed" });
 });
 
+// app.post("/api/reservations", (req, res) => {
+//   const { name, plate_number, rfid_uid, vehicle_type, expected_time_in } = req.body;
+//   if (!name || !plate_number || !rfid_uid || !vehicle_type || !expected_time_in) {
+//     return res.status(400).json({ error: "Missing reservation fields" });
+//   }
+
+//   const insertQuery = `
+//     INSERT INTO reservation (name, plate_number, rfid_uid, vehicle_type, expected_time_in)
+//     VALUES (?, ?, ?, ?, ?)
+//   `;
+
+//   db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (err) => {
+//     if (err) return res.status(500).json({ error: "Failed to add reservation" });
+
+//     console.log(`📌 Reservation for ${name} added`);
+//     res.status(201).json({ message: "Reservation added" });
+//   });
+// });
+
 app.post("/api/reservations", (req, res) => {
   const { name, plate_number, rfid_uid, vehicle_type, expected_time_in } = req.body;
+
+  // 🚨 Validate required fields
   if (!name || !plate_number || !rfid_uid || !vehicle_type || !expected_time_in) {
     return res.status(400).json({ error: "Missing reservation fields" });
   }
 
+  // 🕓 Validate and format expected_time_in in Asia/Manila timezone
+  const parsedExpectedTime = moment(expected_time_in).isValid()
+    ? moment(expected_time_in).tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss")
+    : null;
+
+  if (!parsedExpectedTime) {
+    return res.status(400).json({ error: "Invalid expected_time_in format" });
+  }
+
+  // 💾 Insert into reservation table
   const insertQuery = `
     INSERT INTO reservation (name, plate_number, rfid_uid, vehicle_type, expected_time_in)
     VALUES (?, ?, ?, ?, ?)
   `;
 
-  db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (err) => {
-    if (err) return res.status(500).json({ error: "Failed to add reservation" });
+  db.query(
+    insertQuery,
+    [name, plate_number, rfid_uid, vehicle_type, parsedExpectedTime],
+    (err) => {
+      if (err) {
+        console.error("❌ Reservation insert error:", err);
+        return res.status(500).json({ error: "Failed to add reservation" });
+      }
 
-    console.log(`📌 Reservation for ${name} added`);
-    res.status(201).json({ message: "Reservation added" });
-  });
+      console.log(`📌 Reservation for ${name} added`);
+      res.status(201).json({ message: "Reservation added" });
+    }
+  );
 });
+
 
 app.get("/api/reservations", (req, res) => {
   const query = "SELECT * FROM reservation ORDER BY expected_time_in DESC";

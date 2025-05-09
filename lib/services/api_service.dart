@@ -172,7 +172,7 @@ static Future<bool> addReservation({
   required String plate,
   required String rfid,
   required String expectedTime,
-  required String vehicleType,  // ✅ Added field
+  required String vehicleType,
 }) async {
   final response = await http.post(
     Uri.parse('$apiUrl/api/reservations'),
@@ -182,7 +182,7 @@ static Future<bool> addReservation({
       'plate_number': plate,
       'rfid_uid': rfid,
       'expected_time_in': expectedTime,
-      'vehicle_type': vehicleType,  // ✅ Included
+      'vehicle_type': vehicleType,
     }),
   );
 
