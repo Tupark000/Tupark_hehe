@@ -548,39 +548,54 @@ app.get("/api/users/:rfid_uid", (req, res) => {
 // ======= Reservation Auto Activation =======
 setInterval(() => {
   const formattedNow = moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
-  const fetchDueQuery = "SELECT * FROM reservation WHERE expected_time_in <= ?";
+
+  const fetchDueQuery = `
+    SELECT * FROM reservation 
+    WHERE expected_time_in <= ? AND status = 'PENDING'
+  `;
 
   db.query(fetchDueQuery, [formattedNow], (err, results) => {
-    if (err) return;
+    if (err) {
+      console.error("❌ Error fetching due reservations:", err);
+      return;
+    }
 
     results.forEach((resv) => {
       const { id, name, plate_number, rfid_uid, expected_time_in, vehicle_type } = resv;
 
-      const checkQuery = "SELECT * FROM users WHERE rfid_uid = ?";
-      db.query(checkQuery, [rfid_uid], (checkErr, checkResult) => {
-        if (checkErr || checkResult.length > 0) return;
+      // Avoid duplicating users
+      const checkQuery = "SELECT * FROM users WHERE rfid_uid = ? AND status = 'ACTIVE'";
+      db.query(checkQuery, [rfid_uid], (checkErr, checkResults) => {
+        if (checkErr) {
+          console.error("❌ Error checking active user:", checkErr);
+          return;
+        }
 
-        const insertQuery = `
-          INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
-          VALUES (?, ?, ?, ?, ?, 'ACTIVE')
-        `;
-        db.query(
-          insertQuery,
-          [name, plate_number, rfid_uid, vehicle_type, expected_time_in],
-          (insertErr) => {
-            if (insertErr) return;
+        if (checkResults.length === 0) {
+          // Insert to users table
+          const insertQuery = `
+            INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
+            VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+          `;
+          db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (insertErr) => {
+            if (insertErr) {
+              console.error("❌ Error inserting into users:", insertErr);
+              return;
+            }
 
-            db.query("DELETE FROM reservation WHERE id = ?", [id]);
+            // ✅ Update reservation status to 'ACTIVATED'
+            db.query("UPDATE reservation SET status = 'ACTIVATED' WHERE id = ?", [id]);
 
-            console.log(`🔄 Reservation for ${name} activated`);
+            console.log(`🚀 Activated reservation for ${name} (RFID: ${rfid_uid})`);
             broadcastToClients({
               update: "reservation_activated",
               rfid_uid,
             });
-          }
-        );
+          });
+        }
       });
     });
   });
 }, 5000);
+
 
