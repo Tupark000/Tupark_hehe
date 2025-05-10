@@ -220,6 +220,24 @@ static Future<Map<String, dynamic>?> fetchUserDetails(String rfid) async {
   }
 }
 
+static void listenToReservationActivation(Function(String) onRFIDActivated) {
+  _entranceChannel ??= IOWebSocketChannel.connect(Uri.parse(wsUrl));
+  print("🔗 Listening for reservation activation on WebSocket: $wsUrl");
+
+  _entranceChannel!.stream.listen((data) {
+    try {
+      final decoded = jsonDecode(data);
+      if (decoded['update'] == 'reservation_activated' && decoded['rfid_uid'] != null) {
+        onRFIDActivated(decoded['rfid_uid']);
+      }
+    } catch (e) {
+      print("❌ Error decoding reservation activation message: $e");
+    }
+  }, onError: (error) {
+    print("❌ WebSocket error (reservation activation): $error");
+  });
+}
+
 
 
 

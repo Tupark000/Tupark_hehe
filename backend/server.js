@@ -554,7 +554,7 @@ setInterval(() => {
     if (err) return;
 
     results.forEach((resv) => {
-      const { name, plate_number, rfid_uid, expected_time_in, vehicle_type } = resv;
+      const { id, name, plate_number, rfid_uid, expected_time_in, vehicle_type } = resv;
 
       const checkQuery = "SELECT * FROM users WHERE rfid_uid = ?";
       db.query(checkQuery, [rfid_uid], (checkErr, checkResult) => {
@@ -564,18 +564,23 @@ setInterval(() => {
           INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
           VALUES (?, ?, ?, ?, ?, 'ACTIVE')
         `;
-        db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (insertErr) => {
-          if (insertErr) return;
+        db.query(
+          insertQuery,
+          [name, plate_number, rfid_uid, vehicle_type, expected_time_in],
+          (insertErr) => {
+            if (insertErr) return;
 
-          db.query("DELETE FROM reservation WHERE rfid_uid = ?", [rfid_uid]);
+            db.query("DELETE FROM reservation WHERE id = ?", [id]);
 
-          console.log(`🔄 Reservation for ${name} activated`);
-          broadcastToClients({
-            update: "reservation_activated",
-            rfid_uid,
-          });
-        });
+            console.log(`🔄 Reservation for ${name} activated`);
+            broadcastToClients({
+              update: "reservation_activated",
+              rfid_uid,
+            });
+          }
+        );
       });
     });
   });
 }, 5000);
+
