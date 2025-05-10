@@ -160,6 +160,234 @@
 
 
 
+// import 'package:flutter/material.dart';
+// import 'package:intl/intl.dart';
+// import '../services/api_service.dart';
+
+// class ReservationPage extends StatefulWidget {
+//   const ReservationPage({Key? key}) : super(key: key);
+
+//   @override
+//   State<ReservationPage> createState() => _ReservationPageState();
+// }
+
+// class _ReservationPageState extends State<ReservationPage> {
+//   final TextEditingController _nameController = TextEditingController();
+//   final TextEditingController _plateController = TextEditingController();
+//   DateTime? _selectedDateTime;
+//   String scannedRFID = "Waiting for scan...";
+//   String? lastRFID;
+//   String? vehicleType; // ✅ Vehicle type field
+
+//   @override
+//   void initState() {
+//     super.initState();
+
+//     ApiService.listenToEntranceWebSocket((rfid) {
+//       setState(() {
+//         scannedRFID = "RFID: $rfid";
+//         lastRFID = rfid;
+//       });
+//     });
+//   }
+
+//   @override
+//   void dispose() {
+//     ApiService.disposeWebSockets();
+//     super.dispose();
+//   }
+
+//   Future<void> _pickDateTime() async {
+//     final DateTime? date = await showDatePicker(
+//       context: context,
+//       initialDate: _selectedDateTime ?? DateTime.now(),
+//       firstDate: DateTime.now().subtract(const Duration(days: 1)),
+//       lastDate: DateTime.now().add(const Duration(days: 30)),
+//     );
+
+//     if (date != null) {
+//       final TimeOfDay? time = await showTimePicker(
+//         context: context,
+//         initialTime: TimeOfDay.fromDateTime(_selectedDateTime ?? DateTime.now()),
+//       );
+
+//       if (time != null) {
+//         setState(() {
+//           _selectedDateTime = DateTime(
+//             date.year,
+//             date.month,
+//             date.day,
+//             time.hour,
+//             time.minute,
+//           );
+//         });
+//       }
+//     }
+//   }
+
+//   void _submitReservation() async {
+//     if (_nameController.text.isEmpty ||
+//         _plateController.text.isEmpty ||
+//         lastRFID == null ||
+//         _selectedDateTime == null ||
+//         vehicleType == null) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text("⚠️ Please fill all fields, scan RFID, and select vehicle type.")),
+//       );
+//       return;
+//     }
+
+//     final success = await ApiService.addReservation(
+//       name: _nameController.text.trim(),
+//       plate: _plateController.text.trim(),
+//       rfid: lastRFID!,
+//       expectedTime: _selectedDateTime!.toIso8601String(),
+//       vehicleType: vehicleType!, // ✅ Include vehicle type
+//     );
+
+//     if (success) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text("✅ Reservation added successfully!")),
+//       );
+//       _nameController.clear();
+//       _plateController.clear();
+//       setState(() {
+//         scannedRFID = "Waiting for scan...";
+//         lastRFID = null;
+//         vehicleType = null;
+//         _selectedDateTime = null;
+//       });
+//     } else {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text("❌ Failed to add reservation")),
+//       );
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final formattedDateTime = _selectedDateTime != null
+//         ? DateFormat.yMMMMd().add_jm().format(_selectedDateTime!)
+//         : "Pick expected date and time";
+
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text("Add Reservation"),
+//         backgroundColor: Colors.white,
+//         foregroundColor: Colors.redAccent,
+//         elevation: 1,
+//       ),
+//       body: SingleChildScrollView(
+//         padding: const EdgeInsets.all(24),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.stretch,
+//           children: [
+//             const Text("Reservation Details",
+//                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+//             const SizedBox(height: 16),
+
+//             TextField(
+//               controller: _nameController,
+//               decoration: InputDecoration(
+//                 labelText: "Name",
+//                 filled: true,
+//                 fillColor: Colors.red[50],
+//                 prefixIcon: const Icon(Icons.person),
+//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+//               ),
+//             ),
+//             const SizedBox(height: 16),
+
+//             TextField(
+//               controller: _plateController,
+//               decoration: InputDecoration(
+//                 labelText: "Plate Number",
+//                 filled: true,
+//                 fillColor: Colors.red[50],
+//                 prefixIcon: const Icon(Icons.directions_car),
+//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+//               ),
+//             ),
+//             const SizedBox(height: 16),
+
+//             // ✅ Vehicle Type Dropdown
+//             DropdownButtonFormField<String>(
+//               value: vehicleType,
+//               decoration: InputDecoration(
+//                 labelText: "Vehicle Type",
+//                 filled: true,
+//                 fillColor: Colors.red[50],
+//                 prefixIcon: const Icon(Icons.two_wheeler),
+//                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+//               ),
+//               items: ["Motorcycle", "Car"].map((type) {
+//                 return DropdownMenuItem(
+//                   value: type,
+//                   child: Text(type),
+//                 );
+//               }).toList(),
+//               onChanged: (value) {
+//                 setState(() => vehicleType = value);
+//               },
+//             ),
+//             const SizedBox(height: 20),
+
+//             ListTile(
+//               tileColor: Colors.red[50],
+//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//               title: Text(
+//                 "Expected Time: $formattedDateTime",
+//                 style: const TextStyle(fontWeight: FontWeight.w500),
+//               ),
+//               trailing: const Icon(Icons.calendar_month, color: Colors.redAccent),
+//               onTap: _pickDateTime,
+//             ),
+//             const SizedBox(height: 30),
+
+//             Container(
+//               padding: const EdgeInsets.all(16),
+//               decoration: BoxDecoration(
+//                 color: Colors.red[50],
+//                 borderRadius: BorderRadius.circular(10),
+//                 border: Border.all(color: Colors.redAccent),
+//               ),
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.center,
+//                 children: [
+//                   const Text("Scanned RFID UID:",
+//                       style: TextStyle(fontWeight: FontWeight.w500)),
+//                   const SizedBox(height: 8),
+//                   Text(
+//                     scannedRFID,
+//                     style: const TextStyle(
+//                       fontSize: 16,
+//                       fontWeight: FontWeight.bold,
+//                       color: Colors.redAccent,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             const SizedBox(height: 40),
+
+//             ElevatedButton.icon(
+//               onPressed: _submitReservation,
+//               icon: const Icon(Icons.save),
+//               label: const Text("Confirm Reservation"),
+//               style: ElevatedButton.styleFrom(
+//                 backgroundColor: Colors.redAccent,
+//                 padding: const EdgeInsets.symmetric(vertical: 14),
+//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
@@ -177,12 +405,11 @@ class _ReservationPageState extends State<ReservationPage> {
   DateTime? _selectedDateTime;
   String scannedRFID = "Waiting for scan...";
   String? lastRFID;
-  String? vehicleType; // ✅ Vehicle type field
+  String? vehicleType;
 
   @override
   void initState() {
     super.initState();
-
     ApiService.listenToEntranceWebSocket((rfid) {
       setState(() {
         scannedRFID = "RFID: $rfid";
@@ -237,13 +464,17 @@ class _ReservationPageState extends State<ReservationPage> {
       return;
     }
 
+    // ✅ Format date in "YYYY-MM-DD HH:mm:ss"
+    final formattedTime = DateFormat("yyyy-MM-dd HH:mm:ss").format(_selectedDateTime!);
+
     final success = await ApiService.addReservation(
       name: _nameController.text.trim(),
       plate: _plateController.text.trim(),
       rfid: lastRFID!,
-      expectedTime: _selectedDateTime!.toIso8601String(),
-      vehicleType: vehicleType!, // ✅ Include vehicle type
+      expectedTime: formattedTime, // ✅ match method parameter
+      vehicleType: vehicleType!,
     );
+
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -282,8 +513,7 @@ class _ReservationPageState extends State<ReservationPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text("Reservation Details",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Reservation Details", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
 
             TextField(
@@ -310,7 +540,6 @@ class _ReservationPageState extends State<ReservationPage> {
             ),
             const SizedBox(height: 16),
 
-            // ✅ Vehicle Type Dropdown
             DropdownButtonFormField<String>(
               value: vehicleType,
               decoration: InputDecoration(
@@ -321,24 +550,16 @@ class _ReservationPageState extends State<ReservationPage> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
               items: ["Motorcycle", "Car"].map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Text(type),
-                );
+                return DropdownMenuItem(value: type, child: Text(type));
               }).toList(),
-              onChanged: (value) {
-                setState(() => vehicleType = value);
-              },
+              onChanged: (value) => setState(() => vehicleType = value),
             ),
             const SizedBox(height: 20),
 
             ListTile(
               tileColor: Colors.red[50],
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              title: Text(
-                "Expected Time: $formattedDateTime",
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
+              title: Text("Expected Time: $formattedDateTime", style: const TextStyle(fontWeight: FontWeight.w500)),
               trailing: const Icon(Icons.calendar_month, color: Colors.redAccent),
               onTap: _pickDateTime,
             ),
@@ -354,17 +575,9 @@ class _ReservationPageState extends State<ReservationPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text("Scanned RFID UID:",
-                      style: TextStyle(fontWeight: FontWeight.w500)),
+                  const Text("Scanned RFID UID:", style: TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 8),
-                  Text(
-                    scannedRFID,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.redAccent,
-                    ),
-                  ),
+                  Text(scannedRFID, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.redAccent)),
                 ],
               ),
             ),

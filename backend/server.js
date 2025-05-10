@@ -294,15 +294,6 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cors());
 
-// ====== MySQL Connection ======
-// const db = mysql.createConnection({
-//   host: process.env.DB_HOST,
-//   user: process.env.DB_USER,
-//   password: process.env.DB_PASSWORD,
-//   database: process.env.DB_NAME,
-//   port: process.env.DB_PORT,
-// });
-
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -314,14 +305,6 @@ const db = mysql.createPool({
   queueLimit: 0
 });
 
-
-// db.connect((err) => {
-//   if (err) {
-//     console.error("❌ Database connection failed:", err);
-//     return;
-//   }
-//   console.log("✅ Connected to MySQL database");
-// });
 
 db.query('SELECT 1', (err) => {
   if (err) {
@@ -486,25 +469,6 @@ app.post("/api/users/exit", (req, res) => {
   res.status(200).json({ message: "Exit processed" });
 });
 
-// app.post("/api/reservations", (req, res) => {
-//   const { name, plate_number, rfid_uid, vehicle_type, expected_time_in } = req.body;
-//   if (!name || !plate_number || !rfid_uid || !vehicle_type || !expected_time_in) {
-//     return res.status(400).json({ error: "Missing reservation fields" });
-//   }
-
-//   const insertQuery = `
-//     INSERT INTO reservation (name, plate_number, rfid_uid, vehicle_type, expected_time_in)
-//     VALUES (?, ?, ?, ?, ?)
-//   `;
-
-//   db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (err) => {
-//     if (err) return res.status(500).json({ error: "Failed to add reservation" });
-
-//     console.log(`📌 Reservation for ${name} added`);
-//     res.status(201).json({ message: "Reservation added" });
-//   });
-// });
-
 app.post("/api/reservations", (req, res) => {
   const { name, plate_number, rfid_uid, vehicle_type, expected_time_in } = req.body;
 
@@ -566,6 +530,70 @@ app.get("/api/users/:rfid_uid", (req, res) => {
   });
 });
 
+// ======= Reservation Auto Activation =======
+setInterval(() => {
+  const formattedNow = moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
+  const fetchDueQuery = "SELECT * FROM reservation WHERE expected_time_in <= ?";
+
+  db.query(fetchDueQuery, [formattedNow], (err, results) => {
+    if (err) return console.error("❌ Error fetching due reservations:", err);
+
+    results.forEach((resv) => {
+      const { name, plate_number, rfid_uid, expected_time_in, vehicle_type } = resv;
+
+      // ⚠️ Deactivate any existing ACTIVE users with same UID before inserting new one
+      const deactivateOldQuery = "UPDATE users SET status = 'INACTIVE', time_out = ? WHERE rfid_uid = ? AND status = 'ACTIVE'";
+      const timeOutNow = moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
+
+      db.query(deactivateOldQuery, [timeOutNow, rfid_uid], (deactivateErr) => {
+        if (deactivateErr) {
+          console.error("❌ Failed to deactivate previous user with UID:", rfid_uid, deactivateErr);
+          return;
+        }
+
+        const insertQuery = `
+          INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
+          VALUES (?, ?, ?, ?, ?, 'ACTIVE')
+        `;
+
+        db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (insertErr) => {
+          if (insertErr) return console.error("❌ Insert failed:", insertErr);
+
+          db.query("DELETE FROM reservation WHERE rfid_uid = ?", [rfid_uid]);
+
+          console.log(`✅ Activated reservation for ${name} (RFID: ${rfid_uid})`);
+          broadcastToClients({
+            update: "reservation_activated",
+            rfid_uid,
+          });
+        });
+      });
+    });
+  });
+}, 5000);
+
+
+
+
+// ====== MySQL Connection ======
+// const db = mysql.createConnection({
+//   host: process.env.DB_HOST,
+//   user: process.env.DB_USER,
+//   password: process.env.DB_PASSWORD,
+//   database: process.env.DB_NAME,
+//   port: process.env.DB_PORT,
+// });
+
+
+// db.connect((err) => {
+//   if (err) {
+//     console.error("❌ Database connection failed:", err);
+//     return;
+//   }
+//   console.log("✅ Connected to MySQL database");
+// });
+
+
 // // ======= Reservation Auto Activation =======
 // setInterval(() => {
 //   const formattedNow = moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
@@ -619,46 +647,22 @@ app.get("/api/users/:rfid_uid", (req, res) => {
 //   });
 // }, 5000);
 
-// ======= Reservation Auto Activation =======
-setInterval(() => {
-  const formattedNow = moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
-  const fetchDueQuery = "SELECT * FROM reservation WHERE expected_time_in <= ?";
 
-  db.query(fetchDueQuery, [formattedNow], (err, results) => {
-    if (err) return console.error("❌ Error fetching due reservations:", err);
+// app.post("/api/reservations", (req, res) => {
+//   const { name, plate_number, rfid_uid, vehicle_type, expected_time_in } = req.body;
+//   if (!name || !plate_number || !rfid_uid || !vehicle_type || !expected_time_in) {
+//     return res.status(400).json({ error: "Missing reservation fields" });
+//   }
 
-    results.forEach((resv) => {
-      const { name, plate_number, rfid_uid, expected_time_in, vehicle_type } = resv;
+//   const insertQuery = `
+//     INSERT INTO reservation (name, plate_number, rfid_uid, vehicle_type, expected_time_in)
+//     VALUES (?, ?, ?, ?, ?)
+//   `;
 
-      // ⚠️ Deactivate any existing ACTIVE users with same UID before inserting new one
-      const deactivateOldQuery = "UPDATE users SET status = 'INACTIVE', time_out = ? WHERE rfid_uid = ? AND status = 'ACTIVE'";
-      const timeOutNow = moment().tz("Asia/Manila").format("YYYY-MM-DD HH:mm:ss");
+//   db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (err) => {
+//     if (err) return res.status(500).json({ error: "Failed to add reservation" });
 
-      db.query(deactivateOldQuery, [timeOutNow, rfid_uid], (deactivateErr) => {
-        if (deactivateErr) {
-          console.error("❌ Failed to deactivate previous user with UID:", rfid_uid, deactivateErr);
-          return;
-        }
-
-        const insertQuery = `
-          INSERT INTO users (name, plate_number, rfid_uid, vehicle_type, time_in, status)
-          VALUES (?, ?, ?, ?, ?, 'ACTIVE')
-        `;
-
-        db.query(insertQuery, [name, plate_number, rfid_uid, vehicle_type, expected_time_in], (insertErr) => {
-          if (insertErr) return console.error("❌ Insert failed:", insertErr);
-
-          db.query("DELETE FROM reservation WHERE rfid_uid = ?", [rfid_uid]);
-
-          console.log(`✅ Activated reservation for ${name} (RFID: ${rfid_uid})`);
-          broadcastToClients({
-            update: "reservation_activated",
-            rfid_uid,
-          });
-        });
-      });
-    });
-  });
-}, 5000);
-
-
+//     console.log(`📌 Reservation for ${name} added`);
+//     res.status(201).json({ message: "Reservation added" });
+//   });
+// });

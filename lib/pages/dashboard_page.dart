@@ -270,8 +270,8 @@ class _DashboardPageState extends State<DashboardPage> {
     });
 
     // ✅ Listen to reservation activation WebSocket
-    ApiService.listenToReservationActivation((rfid) {
-      print("🔄 Reservation activated for RFID: $rfid");
+    ApiService.listenToEntranceWebSocket((rfid) {
+      print("📢 Activated or scanned RFID: $rfid");
       fetchUsers();
     });
   }
