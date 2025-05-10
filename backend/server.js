@@ -315,13 +315,22 @@ const db = mysql.createPool({
 });
 
 
-db.connect((err) => {
+// db.connect((err) => {
+//   if (err) {
+//     console.error("❌ Database connection failed:", err);
+//     return;
+//   }
+//   console.log("✅ Connected to MySQL database");
+// });
+
+db.query('SELECT 1', (err) => {
   if (err) {
-    console.error("❌ Database connection failed:", err);
-    return;
+    console.error("❌ Database test query failed:", err);
+  } else {
+    console.log("✅ MySQL connection pool is ready");
   }
-  console.log("✅ Connected to MySQL database");
 });
+
 
 // ====== Start Server ======
 const server = app.listen(PORT, () => {
