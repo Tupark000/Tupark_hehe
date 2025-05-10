@@ -240,7 +240,6 @@
 
 // }
 
-
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/io.dart';
@@ -251,95 +250,17 @@ class ApiService {
   static const String wsUrl = "wss://tuparkhehe-production.up.railway.app/ws";
   static const String wsUnifiedUrl = "wss://tuparkhehe-production.up.railway.app/ws";
 
-  // === WebSocket Channels and Streams ===
-  static WebSocketChannel? _entranceChannel;
-  static WebSocketChannel? _exitChannel;
-
-  static late Stream _entranceStream;
-  static late Stream _exitStream;
-
-  static void _ensureEntranceWebSocket() {
-    if (_entranceChannel == null) {
-      _entranceChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
-      _entranceStream = _entranceChannel!.stream.asBroadcastStream();
-      print("🔗 Entrance WebSocket Connected");
-    }
+  // Login method
+  Future<bool> login(String email, String password) async {
+    final response = await http.post(
+      Uri.parse("$apiUrl/login"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"email": email, "password": password}),
+    );
+    return response.statusCode == 200;
   }
 
-  static void _ensureExitWebSocket() {
-    if (_exitChannel == null) {
-      _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsUnifiedUrl));
-      _exitStream = _exitChannel!.stream.asBroadcastStream();
-      print("🔗 Exit WebSocket Connected");
-    }
-  }
-
-  static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
-    _ensureEntranceWebSocket();
-
-    _entranceStream.listen((data) {
-      print("📩 WebSocket (Entrance) Message Received: $data");
-
-      try {
-        final decoded = jsonDecode(data);
-        if (decoded['scanned_uid'] != null && decoded['type'] == 'ENTRANCE') {
-          onRFIDReceived(decoded['scanned_uid']);
-        }
-      } catch (e) {
-        print("❌ JSON Parse Error (Entrance): $e");
-      }
-    });
-  }
-
-  static void listenToReservationActivation(Function(String) onRFIDReceived) {
-    _ensureEntranceWebSocket();
-
-    _entranceStream.listen((data) {
-      try {
-        final decoded = jsonDecode(data);
-        if (decoded['update'] == 'reservation_activated' && decoded['rfid_uid'] != null) {
-          print("🚀 Reservation moved to ACTIVE: ${decoded['rfid_uid']}");
-          onRFIDReceived(decoded['rfid_uid']);
-        }
-      } catch (e) {
-        print("❌ JSON Parse Error (Reservation): $e");
-      }
-    });
-  }
-
-  static void listenToExitWebSocket(Function(String) onRFIDReceived) {
-    _ensureExitWebSocket();
-
-    _exitStream.listen((data) {
-      print("📩 WebSocket (Exit) Message Received: $data");
-
-      try {
-        final decoded = jsonDecode(data);
-        if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT_SCAN') {
-          onRFIDReceived(decoded['scanned_uid']);
-        }
-      } catch (e) {
-        print("❌ JSON Parse Error (Exit): $e");
-      }
-    });
-  }
-
-  static void disposeWebSockets() {
-    if (_entranceChannel != null) {
-      _entranceChannel!.sink.close();
-      _entranceChannel = null;
-      print("🔴 Entrance WebSocket Closed");
-    }
-
-    if (_exitChannel != null) {
-      _exitChannel!.sink.close();
-      _exitChannel = null;
-      print("🔴 Exit WebSocket Closed");
-    }
-  }
-
-  // === REST API Calls ===
-
+  // Fetch ACTIVE users
   static Future<List<dynamic>> fetchUsers() async {
     final response = await http.get(Uri.parse("$apiUrl/api/users"));
     if (response.statusCode == 200) {
@@ -349,30 +270,7 @@ class ApiService {
     }
   }
 
-  static Future<List<dynamic>> fetchInactiveUsers() async {
-    final response = await http.get(Uri.parse("$apiUrl/api/users/inactive"));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as List<dynamic>;
-    } else {
-      throw Exception("Failed to load inactive users");
-    }
-  }
-
-  static Future<Map<String, dynamic>?> fetchUserDetails(String rfid) async {
-    try {
-      final response = await http.get(Uri.parse('$apiUrl/api/users/$rfid'));
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        print("❌ No active user found. Status: ${response.statusCode}");
-        return null;
-      }
-    } catch (e) {
-      print("❌ Error fetching user: $e");
-      return null;
-    }
-  }
-
+  // Add new user (with vehicleType)
   static Future<bool> addUser(String name, String plate, String rfid, String vehicleType) async {
     if (rfid == "Waiting..." || rfid.isEmpty) {
       print("⚠️ No valid RFID scanned.");
@@ -402,6 +300,7 @@ class ApiService {
     }
   }
 
+  // Exit user via API
   static Future<bool> exitUser(String rfid) async {
     try {
       final response = await http.post(
@@ -409,13 +308,40 @@ class ApiService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'rfid_uid': rfid}),
       );
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        print("✅ User exit processed.");
+        return true;
+      } else {
+        print("❌ Failed to process exit: ${response.body}");
+        return false;
+      }
     } catch (e) {
       print('❌ Error exiting user: $e');
       return false;
     }
   }
 
+  // Fetch INACTIVE users
+  static Future<List<dynamic>> fetchInactiveUsers() async {
+    final response = await http.get(Uri.parse("$apiUrl/api/users/inactive"));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception("Failed to load inactive users");
+    }
+  }
+
+  // Fetch reservations
+  static Future<List<dynamic>> fetchReservations() async {
+    final response = await http.get(Uri.parse("$apiUrl/api/reservations"));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception("Failed to load reservations");
+    }
+  }
+
+  // Add reservation with vehicleType
   static Future<bool> addReservation({
     required String name,
     required String plate,
@@ -434,17 +360,108 @@ class ApiService {
         'vehicle_type': vehicleType,
       }),
     );
+
     return response.statusCode == 201;
   }
 
-  static Future<List<dynamic>> fetchReservations() async {
-    final response = await http.get(Uri.parse("$apiUrl/api/reservations"));
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as List<dynamic>;
-    } else {
-      throw Exception("Failed to load reservations");
+  // Fetch user by RFID
+  static Future<Map<String, dynamic>?> fetchUserDetails(String rfid) async {
+    try {
+      final url = '$apiUrl/api/users/$rfid';
+      print("📡 Fetching user details from: $url");
+
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        print("✅ User data: ${response.body}");
+        return jsonDecode(response.body);
+      } else {
+        print("❌ No active user found. Status: ${response.statusCode}");
+        return null;
+      }
+    } catch (e) {
+      print("❌ Error fetching user: $e");
+      return null;
     }
   }
-}
 
+  // WebSocket Channels
+  static WebSocketChannel? _entranceChannel;
+  static WebSocketChannel? _exitChannel;
+
+  // Entrance listener
+  static void listenToEntranceWebSocket(Function(String) onRFIDReceived) {
+    _entranceChannel = IOWebSocketChannel.connect(Uri.parse(wsUrl));
+    print("🔗 Connecting to WebSocket (Entrance): $wsUrl");
+
+    _entranceChannel!.stream.listen((data) {
+      print("📩 WebSocket (Entrance) Message Received: $data");
+
+      try {
+        final decoded = jsonDecode(data);
+
+        if (decoded['scanned_uid'] != null && decoded['type'] == 'ENTRANCE') {
+          onRFIDReceived(decoded['scanned_uid']);
+        } else if (decoded['update'] == 'reservation_activated') {
+          print("🚀 Reservation moved to ACTIVE: ${decoded['rfid_uid']}");
+          onRFIDReceived(decoded['rfid_uid']);
+        }
+      } catch (e) {
+        print("❌ JSON Parse Error (Entrance): $e");
+      }
+    }, onError: (error) {
+      print("❌ WebSocket (Entrance) Error: $error");
+    }, onDone: () {
+      print("🔌 Entrance WebSocket Closed");
+    });
+  }
+
+  // Exit listener
+  static void listenToExitWebSocket(Function(String) onRFIDReceived) {
+    _exitChannel = IOWebSocketChannel.connect(Uri.parse(wsUnifiedUrl));
+    print("🔗 Connecting to WebSocket (Exit): $wsUnifiedUrl");
+
+    _exitChannel!.stream.listen((data) {
+      print("📩 WebSocket Message (Exit) Received: $data");
+
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded['scanned_uid'] != null && decoded['type'] == 'EXIT_SCAN') {
+          onRFIDReceived(decoded['scanned_uid']);
+        }
+      } catch (e) {
+        print("❌ JSON Parse Error (Exit): $e");
+      }
+    }, onError: (error) {
+      print("❌ WebSocket Error (Exit): $error");
+    }, onDone: () {
+      print("🔌 Exit WebSocket Closed");
+    });
+  }
+
+  // Reservation activation listener
+  static void listenToReservationActivation(Function(String) onRFIDActivated) {
+    _entranceChannel ??= IOWebSocketChannel.connect(Uri.parse(wsUrl));
+    print("🔗 Listening for reservation activation on WebSocket: $wsUrl");
+
+    _entranceChannel!.stream.listen((data) {
+      try {
+        final decoded = jsonDecode(data);
+        if (decoded['update'] == 'reservation_activated' && decoded['rfid_uid'] != null) {
+          onRFIDActivated(decoded['rfid_uid']);
+        }
+      } catch (e) {
+        print("❌ Error decoding reservation activation message: $e");
+      }
+    }, onError: (error) {
+      print("❌ WebSocket error (reservation activation): $error");
+    });
+  }
+
+  // Dispose all channels
+  static void disposeWebSockets() {
+    _entranceChannel?.sink.close();
+    _exitChannel?.sink.close();
+    print("🔴 All WebSockets closed");
+  }
+}
 
